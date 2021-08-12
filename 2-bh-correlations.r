@@ -12,7 +12,7 @@ source('0-functions.r')
 # read data
 ret0 = fread('../data/clean_ret.csv')
 
-# make a balanced matrix
+# make a balanced matrix [xxx fix me]
 retwide0 = pivot_wider(
   ret0, c(signalname,date,ret), names_from = signalname, values_from = ret
 )
