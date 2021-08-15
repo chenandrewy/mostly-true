@@ -1,42 +1,49 @@
 # 2021 08 Andrew
-# Shows validity of BH under correlations
+# Simulation verification
 
 
-# ==== ENVIRONMENT ====
+# ENVIRONMENT ====
 rm(list=ls())
 library(data.table)
 library(tidyverse)
 library(ggplot2)
+library(gridExtra)
 source('0-functions.r')
 
 # read data
-ret0 = fread('../data/clean_ret.csv')
-
-# make a balanced matrix [xxx fix me]
-retwide0 = pivot_wider(
-  ret0, c(signalname,date,ret), names_from = signalname, values_from = ret
-)
-retmat = retwide0 %>% select(-date) %>% as.matrix()
-colnames(retmat) = NULL
-numt = colSums(!is.na(retmat))
-igood = numt > 500
-retmat = retmat[ , igood]
-retmat = retmat[complete.cases(retmat) , ]
+retwide = fread('../data/balanced_ret.csv')
+retmat = as.matrix(retwide)
 
 # generate residuals
 rbar = colMeans(retmat) %>% as.matrix() %>% t()
 l = 1+integer(nrow(retmat)) %>% as.matrix 
 emat = retmat - l %*% rbar
 
-# ==== SIMULATE ====
+# SIMULATE ====
+
+# It seems like no matter what kind of simulation you set up,
+# the FDR is always tiny for t>3.0.  
+# This seems like a numerical issue, since theoreitcally
+# FDR(3.0) can be as high as pnull, and will be pnull
+# if pnull = 1 or the alternative dist -> N(0,1)
+
+# thing is, when I crank pnull -> 1 or alt dist -> N(0,1)
+# I get no observatiosn for t > 3.0.  
+# Intuitively, pnorm(-3) is about 1 in 1000, so 
+# 
+
+# I feel like something is up with my sim
+
+set.seed(1)
 source('0-functions.r')
-N = 1000;
-pnull = 0.5
+N = 1e5;
+pnull = 0.9
 shape = 1
-scale = 0.5
+scale = 1
+loc   = 0.5
 Nemp = dim(retmat)[2]
 
-simulate = function(N,pnull,shape,scale){
+simulate = function(N,pnull,shape,scale,loc){
   
   # simulate null
   Nalt = sum(runif(N) > pnull)
@@ -46,14 +53,20 @@ simulate = function(N,pnull,shape,scale){
   
   # simulate mu
   mu = numeric(N)
-  mu[!null] = rgamma(Nalt, shape, 1/scale)
-  # mu[!null] = scale
+  # mu[!null] = rgamma(Nalt, shape, 1/scale)
+  mu[!null] = rnorm(Nalt, loc, scale)
   mu[1:round(Nalt/2)] = -mu[1:round(Nalt/2)]
   
   # simulate returns
-  i = sample(1:Nemp,N,replace=T)
-  tau = sample(1:nrow(emat), 500, replace = T)
-  esim = emat[tau,i] # check me
+  # i = sample(1:Nemp,N,replace=T)
+  # tau = sample(1:nrow(emat), 500, replace = T)
+  # esim1 = emat[tau, ] # check me
+  # esim  = esim1[   ,i]
+  
+  # debug
+  esim = rnorm(N*500,0,5)
+  esim = matrix(as.matrix(esim), nrow = 500)
+
   musim = as.matrix(1+integer(nrow(esim))) %*% t(as.matrix(mu))
   rsim = musim + esim
   
@@ -61,14 +74,7 @@ simulate = function(N,pnull,shape,scale){
   tsim = colMeans(rsim)/apply(rsim,2,sd)*sqrt(nrow(rsim))
   tsim = abs(tsim)
   
-  # output selected
-  simtab = data.table(
-    t = tsim
-    , mu = mu
-    , null = null
-  )
-  
-  # sorted dataset
+  # output sorted dataset
   isort = order(-tsim)
   simsort = data.frame(
     t = tsim[isort]
@@ -77,55 +83,55 @@ simulate = function(N,pnull,shape,scale){
     , p = 2*pnorm(-tsim[isort])
   )
   
-  simsort = simsort %>% mutate(fdr = cummean(null))
-  
-  
-  sim = list(
-    rmat = rsim
-    , raw = simtab
-    , sort = simsort
-  )
-  
+  simsort = simsort %>% mutate(fdrdat = cummean(null))
+
 } # end function
-
-sim = simulate(N,pnull,shape,scale)
-
-# ==== ====
-
-# simple check better ==== 
-
-dat = sim$sort %>%  as.data.table()
-
-tlist = seq(0,3,0.1)
-
-fdr = numeric(length(tlist))
-fdrhat = fdr
-for (ti in 1:length(tlist)){
-  i = which(dat$t>tlist[ti])
-  fdr[ti] = mean(as.numeric(dat$null[i]))
+select_for_pub = function(simsort, tbad, tgood, smarg, sbar){
+  simsort$u = runif(dim(simsort)[1]) 
+  simsort = simsort %>% 
+    mutate(
+      pub = F
+      , pub = case_when(
+         t > tbad & t <= tgood & u < smarg ~ T
+         , t > tgood & u < sbar ~ T
+      )
+    )
 }
-fdr
-
-# ez bh calc ====
 
 
-temp = sim$sort %>% 
+
+
+# ====
+
+
+
+
+# plot simulation distributions
+p1 = ggplot(
+  sim  %>% filter(abs(t)<10)
+  ,aes(x=t,fill=null)) +
+  geom_histogram(position = 'identity', alpha = 0.6)
+p2 = ggplot(
+  sim  %>% filter(pub, abs(t)<10)
+  ,aes(x=t,fill=null)) +
+  geom_histogram(position = 'identity', alpha = 0.6)
+grid.arrange(p1,p2)
+
+
+
+
+## estimate 
+source('0-functions.r')
+nsim = 1e4
+
+temp = sim %>% 
+  arrange(p) %>% 
   mutate(
-    fdrhat = 2*pnorm(-t)/(row_number()/N)
-    , fdr/fdrhat
+    fdrexp = 2*pnorm(-t)/(row_number()/N)*fitexp$C
+    , fdrmix = 2*pnorm(-t)/(row_number()/N)*fitmix$C
   )
 
 
-plotme = temp %>% 
-  select(c(t, fdr,fdrhat)) %>% 
-  filter( t < 10) %>% 
-  pivot_longer(
-    c(fdr,fdrhat)
-  , names_to = 'type', values_to = 'fdr'
-)
-ggplot(data=plotme, aes(x=t, y=fdr, group = type)) + 
-  geom_line(aes(linetype=type)) + 
-  ylim(0,1.0)
 
 
 # ====
@@ -153,9 +159,9 @@ filter( t<3)
 ggplot(data=plotme, aes(x=t, y=fdr, group=name)) +
   geom_line(aes(linetype=name, color = name))
 
-# ====
+# actual fdrs ====
 
-thurdle = bh$hurdle$thurdle
+thurdle = seq(0,6,0.5)
 
 # add actuals
 hurdle_actual = bh$hurdle

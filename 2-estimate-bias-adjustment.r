@@ -27,13 +27,75 @@ signalsum = ret %>%
     , t = rbar/vol*sqrt(nmonth)
   )
 
+t_emp = signalsum$t
 
-# ==== SYMMETRIC MIXTURE ESTIMATION ====
+
+# ==== ESTIMATE ====
+
+# FIXED PARAMETERS
+tgood = 2.6
+
+pnull = 0.9
+shape = 2
+sigma = 1
+
+fitexp = estimate_exponential(t_emp,tgood)
+fitmix = estimate_mixture(t_emp,tgood,pnull,shape,sigma)
+
+
+# ==== FIGURES ====
+source('0-functions.r')
+nsim = 1e5
+
+## create data frame with all groups
+t_exp = rexp(nsim,1/fitexp$scalehat)
+t_mix = rmix(nsim,fitmix$pnull,fitmix$shape,fitmix$scalehat,fitmix$sigma)
+
+datall = data.frame(t = t_emp, group = 'emp') %>% 
+  rbind(
+    data.frame(t = t_exp, group = 'exp')
+  ) %>% 
+  rbind(
+    data.frame(t = t_mix, group = 'mix')
+  )
+
+
+edge = seq(-0,14,0.25)
+hall = datall %>% 
+  filter(t>min(edge), t<max(edge)) %>% 
+  group_by(group) %>% 
+  summarize(
+    tmid = hist(t,edge)$mid
+    , density = hist(t,edge)$density
+  ) %>% 
+  left_join(
+    datall %>% group_by(group) %>% summarise(Pr_good = sum(t>tgood)/n())
+  ) %>% 
+  mutate(
+    density_good = density/Pr_good
+  )
+  
+## plot all
+ggplot(hall, aes(x=tmid, y=density_good, fill=group)) +
+  geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = T) 
+
+ggsave(filename = '../results/Pr_good_fit_all.pdf', width = 10, height = 8)
+
+## plot t > 2 only
+ggplot(
+  hall 
+  , aes(x=tmid, y=density_good, fill=group)) +
+  geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = T)  +
+  coord_cartesian(ylim=c(0,1.5))
+
+ggsave(filename = '../results/Pr_good_fit_zoom.pdf', width = 10, height = 8)
+
+# ==== MIX GAMMA SMM ON DECILES (FOR APPENDIX)  ====
 pnulllist = seq(0.05,0.95,0.05)
-pnulllist = 0.90
+pnulllist = 0.5
 shape = 2
 scale = 1/shape
-n = 10000
+n = 1e5
 tgood = 2.6
 
 # t_emp = sample( signalsum$t,length(signalsum$t),replace=T)
@@ -41,44 +103,39 @@ t_emp = signalsum$t
 
 
 qlist = seq(0.1,0.9,0.1)
-# qlist = seq(0.25,0.75,0.25)
+# qlist = seq(0.5)
 momfun = function(t,i){
   quantile(t[i],qlist)
 }
 momboot = boot(t_emp, momfun, R=100)
 
-
 randt = function(pnull,scale,tmin){
-  altp  = rgamma(round(n*(1-pnull)/2),shape,1/scale)
-  altn = -rgamma(round(n*(1-pnull)/2),shape,1/scale)
+  talt  = rgamma(round(n*(1-pnull)),shape,1/scale)
   tnull = rnorm(round(n*pnull))
-
-  t = abs(c(tnull,altp,altn))
+  
+  t = abs(c(tnull,talt))
   tlist = list(
     t = t[t>tmin]
-    ,talt  = c(altp,altn)
+    ,talt  = talt
     ,tnull = tnull  
   )
 }
 
-# check t assumption
-tsim = randt(pnull, scale, -Inf)
-plotme = data.frame(t = tsim$talt, group = 'alt') %>%
-  rbind(
-    data.frame(t=tsim$tnull, group = 'null')
-  )
-ggplot(plotme, aes(x=t, fill=group)) +
-  geom_histogram(position = 'identity', alpha = 0.6, bins=40)
-
 
 w = 1/diag(var(momboot$t))
+# obj = function(par){
+#   # par is (pnull,scale)
+#   x = randt(par[1],par[2],tgood)
+#   mean( w*(quantile(x$t, qlist) 
+#            - quantile(t_emp[t_emp>tgood], qlist))^2 )  
+# }
+
+# testing mean
 obj = function(par){
   # par is (pnull,scale)
   x = randt(par[1],par[2],tgood)
-  mean( w*(quantile(x$t, qlist) 
-           - quantile(t_emp[t_emp>tgood], qlist))^2 )  
+  ( mean(x$t) - mean(t_emp[t_emp>tgood]) )^2  
 }
-
 
 # optimize in 1D many times
 scalelist = numeric(length(pnulllist))
@@ -125,34 +182,47 @@ p1 = ggplot(plotme, aes(x=t, y=f, fill=group)) +
   geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = F) 
 
 p2 = ggplot(
-  plotme %>% filter(t>1.0)
+  plotme %>% filter(t>2)
   , aes(x=t, y=f, fill=group)
 ) +
   geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = F) 
 
 # plot t assumption
 plotme = data.frame(t = tsim$talt, group = 'alt') %>%
-rbind(
-  data.frame(t=tsim$tnull, group = 'null')
-)
+  rbind(
+    data.frame(t=tsim$tnull, group = 'null')
+  )
 p0 = ggplot(plotme, aes(x=t, fill=group)) +
   geom_histogram( aes(y=..density..), position = 'identity', bins=40, alpha = 0.6, show.legend = F ) 
 
-grid.arrange(p1, p2, p0, nrow=1)
+grid.arrange(p1, p2, nrow=1)
 
 C = length(tsim$t)/sum(tsim$t>2.6)
-print(C)
 
+print(C)
 print(pnullhat)
 print(scalehat)
 print(scalehat*shape)
 print(objhat)
 
 
-nalt = sum(tsim$talt > 2.6)
-nnull = sum(tsim$tnull > 2.6)
 
-nnull/(nnull+nalt)
+fdis = 0.8
+tbar = quantile(t_emp,(1-fdis))
+fdrhat = 2*pnorm(-tbar)/fdis*C
+
+fdis
+fdrhat
+
+
+fdis = 0.7
+tbar = quantile(t_emp,(1-fdis))
+fdrhat = 2*pnorm(-tbar)/fdis*C
+
+fdis
+fdrhat
+
+
 
 # ==== FDR BOUNDS ====
 

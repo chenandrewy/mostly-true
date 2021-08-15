@@ -125,6 +125,10 @@ retwide = ret %>%
 
 corbalanced = cor(retwide, use = 'complete.obs')
 
+# save balanced matrix 
+write_csv(retwide, '../data/balanced_ret.csv')
+
+
 ## tables ====
 qlist = seq(0.1,0.9,0.1)
 
@@ -151,3 +155,51 @@ tab_corr_quantiles
 
 
 
+# ====
+finalMatrix <- rbind(tab_univar_quantiles, tab_corr_quantiles)
+
+# Need to make these numbers shorter. Otherwise, they won't fit in one page.
+finalMatrix <- round(finalMatrix, 1)
+finalMatrix[3,] = as.integer(round(finalMatrix[3,],0))
+finalMatrix
+
+# Take transpose
+finalMatrix <- t(finalMatrix)
+# Rearrange columns
+order <- c("t", "rbar", "vol", "nmonth", "pairwise", "subset complete")
+finalMatrix <- finalMatrix[,order]
+#Take transpose again
+finalMatrix <- t(finalMatrix)
+
+# % character in column names will cause issues with latex. Remove them.
+colnames(finalMatrix) <- gsub("\\%", "", colnames(finalMatrix))
+
+# Specify rownames
+rownames(finalMatrix) <- c(Hmisc::latexTranslate("| t |"),
+                           "Mean Return",
+                           "Volatility",
+                           "Num of Obs",
+                           "Pairwise",
+                           "Subset Complete")
+finalMatrix
+
+# LATEX TABLE ------------------------------------------------------------
+
+# Produces latex table code
+capture.output(
+  Hmisc::latex(finalMatrix,
+               file = "",
+               table.env=F,
+               cgroup = "Percentile",
+               n.cgroup = 9,
+               rgroup = c("Section 1", "Section 2"),
+               n.rgroup = c(length(row.names(tab_univar_quantiles)),
+                            length(row.names(tab_corr_quantiles))),
+               cgroupTexCmd = "normalfont",
+               rgroupTexCmd = "normalfont",
+               col.just = c('c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'), 
+               colhead = colnames(finalMatrix),
+               math.row.names = F,
+               first.hline.double = FALSE,
+               insert.bottom = ""),
+  file = "table.tex")

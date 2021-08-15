@@ -492,28 +492,28 @@ signalsum = ret %>%
 t_emp = signalsum$t
 t_emp = t_emp[t_emp>1.96]
 
-# conditional expectation of folded norm
-fe_normf = function(x){abs(x)*dnorm(x)} # function to integrate to get expectation
-e_tnormf = function(xmin){ # integrate expecation
-  integrate(f, xmin, Inf)
+
+
+
+
+# ====
+
+# add actuals
+thurdle = seq(0,6,0.5)
+fdr_actual = numeric(length(thurdle)) + NA_real_
+t = sim$t
+null = sim$null
+
+fdr_actual = numeric(length(thurdle))
+for (ti in 1:length(thurdle)){
+  idisc =t>thurdle[ti]
+  fdr_actual[ti] = mean(as.numeric(null[idisc]))
 }
 
 
-
-
-pnull = 0.95
-e_alt = mean(t_emp[t_emp>2.6])/(1-pnull)-2.6
-S_tgood = (1-pnull)*exp(-2.6/e_alt)
-C = 1/S_tgood
-
-
-
-tbar = quantile(t_emp,0.2)
-fdrhat = 2*pnorm(-tbar)/(sum(t_emp>tbar)/length(t_emp))*C
-
-e_alt
-S_tgood
-fdrhat
+fdr = data.frame(
+  t = t, fdr_actual
+)
 
 
 
