@@ -1,7 +1,7 @@
 # 2021 08 Andrew
 # frequently used functions for bh with pub bias
 
-# ==== BENJAMINI HOCHBERG PLUS ====
+# ==== FDR ESTIMATION  ====
 
 run_bh_plus = function(t,C=1,qlist=c(0.01, 0.05, 0.10, 0.20)){
   
@@ -32,6 +32,45 @@ run_bh_plus = function(t,C=1,qlist=c(0.01, 0.05, 0.10, 0.20)){
   )
   
 } # end function
+
+estimate_fdr = function(
+  t
+  , tbarlist = seq(0,6,0.5)    
+  , C = 1
+  , nulldf = 200
+  , null = numeric(length(t))*NA
+){
+  
+  # initialize
+  fdrlist = numeric(length(tbarlist))*NA
+  drlist = fdrlist
+  fdrhatlist = fdrlist
+  
+  # estimate for each tbar in tbarlist
+  for (ti in 1:length(tbarlist)){
+    i = abs(t)>tbarlist[ti]
+    
+    # discovery rate
+    drlist[ti] = sum(i)/length(t)
+    
+    # find fdrs
+    if (sum(i) > 0){
+      fdrhatlist[ti] = 2*pt(-tbarlist[ti],nulldf)/drlist[ti]*C
+      fdrlist[ti] = mean(null[i])
+      
+    } else{
+      fdrlist[ti] = 0
+      fdrhatlist[ti] = 0
+    }
+  }
+  est = data.frame(
+    tbar = tbarlist
+    , dr = drlist
+    , fdr_actual =  fdrlist
+    , fdrhat = fdrhatlist 
+  )
+} # end function
+
 
 # ==== PLOT TWO HISTGORAMS ====
 
@@ -157,7 +196,7 @@ minme = function(scale){
 est = optimize(minme,c(0.1/shape,6/shape))
 
 # find Pr(|t|>tgood)
-tempd = function(t){dmix(t,pnull,est$minimum)}
+tempd = function(t){dmix(t,pnull,1/est$minimum)}
 Pr_tgood = integrate(tempd,tgood,Inf)$value
 
 ## pack results

@@ -1,231 +1,377 @@
 # 2021 08 Andrew
 # Simulation verification
 
-
-# ENVIRONMENT ====
 rm(list=ls())
+# ENVIRONMENT ====
 library(data.table)
 library(tidyverse)
 library(ggplot2)
 library(gridExtra)
 source('0-functions.r')
 
-# read data
+# full data stats
+ret = fread('../data/clean_ret.csv')
+signalsum = ret %>% 
+  filter(insamp) %>% 
+  group_by(signalname) %>% 
+  summarize(
+    rbar = mean(ret)
+    , vol = sd(ret)
+    , nmonth = n()
+    , t = rbar/vol*sqrt(nmonth)
+  )
+
+# balanced data
 retwide = fread('../data/balanced_ret.csv')
 retmat = as.matrix(retwide)
 
 # generate residuals
 rbar = colMeans(retmat) %>% as.matrix() %>% t()
 l = 1+integer(nrow(retmat)) %>% as.matrix 
-emat = retmat - l %*% rbar
+ematemp = retmat - l %*% rbar
+Nemp = dim(ematemp)[2]
+Temp = dim(ematemp)[1]
 
-# SIMULATE ====
 
-# It seems like no matter what kind of simulation you set up,
-# the FDR is always tiny for t>3.0.  
-# This seems like a numerical issue, since theoreitcally
-# FDR(3.0) can be as high as pnull, and will be pnull
-# if pnull = 1 or the alternative dist -> N(0,1)
-
-# thing is, when I crank pnull -> 1 or alt dist -> N(0,1)
-# I get no observatiosn for t > 3.0.  
-# Intuitively, pnorm(-3) is about 1 in 1000, so 
-# 
-
-# I feel like something is up with my sim
-
-set.seed(1)
-source('0-functions.r')
-N = 1e5;
-pnull = 0.9
-shape = 1
-scale = 1
-loc   = 0.5
-Nemp = dim(retmat)[2]
-
-simulate = function(N,pnull,shape,scale,loc){
-  
-  # simulate null
-  Nalt = sum(runif(N) > pnull)
-  null = integer(N)+1
-  null[1:Nalt] = 0
-  null = as.logical(null)
-  
-  # simulate mu
-  mu = numeric(N)
-  # mu[!null] = rgamma(Nalt, shape, 1/scale)
-  mu[!null] = rnorm(Nalt, loc, scale)
-  mu[1:round(Nalt/2)] = -mu[1:round(Nalt/2)]
-  
-  # simulate returns
-  # i = sample(1:Nemp,N,replace=T)
-  # tau = sample(1:nrow(emat), 500, replace = T)
-  # esim1 = emat[tau, ] # check me
-  # esim  = esim1[   ,i]
-  
-  # debug
-  esim = rnorm(N*500,0,5)
-  esim = matrix(as.matrix(esim), nrow = 500)
-
-  musim = as.matrix(1+integer(nrow(esim))) %*% t(as.matrix(mu))
-  rsim = musim + esim
-  
-  # find t-stats
-  tsim = colMeans(rsim)/apply(rsim,2,sd)*sqrt(nrow(rsim))
-  tsim = abs(tsim)
-  
-  # output sorted dataset
-  isort = order(-tsim)
-  simsort = data.frame(
-    t = tsim[isort]
-    , mu = mu[isort]
-    , null = null[isort]
-    , p = 2*pnorm(-tsim[isort])
-  )
-  
-  simsort = simsort %>% mutate(fdrdat = cummean(null))
-
-} # end function
-select_for_pub = function(simsort, tbad, tgood, smarg, sbar){
-  simsort$u = runif(dim(simsort)[1]) 
-  simsort = simsort %>% 
+## FUNCTIONS USED THROUGHOUT SECTIONS
+# tdat is a dataframe with columns (t, other stuff)
+tdat_to_tdatpub = function(tdat, tbad=1.96, tgood=2.6, smarg=0.5, sbar=1){
+  tdat$u = runif(dim(tdat)[1]) 
+  tdat = tdat %>% 
     mutate(
       pub = F
       , pub = case_when(
-         t > tbad & t <= tgood & u < smarg ~ T
-         , t > tgood & u < sbar ~ T
+        t > tbad & t <= tgood & u < smarg ~ T
+        , t > tgood & u < sbar ~ T
       )
-    )
+    ) %>% 
+    filter(pub) %>% 
+    select(-pub)
+} # end function 
+
+
+
+# SIM1: RESIDUAL BOOTSTRAP ====
+nsim = 100
+pnull = 0.9
+Emualt = 0.5
+T_ = 200
+tbarlist = seq(0,5,0.25)
+emat = ematemp
+
+## functions 
+esimbootc = function(T_){
+  imonth  = sample(1:Temp,T_, replace = T) # draw list of months
+  esim = emat[imonth, ]
 }
 
+e_to_tdat = function(pnull,Emualt,emat){
+  T_ = dim(emat)[1]
+  N = dim(emat)[2]
+  
+  # adjust for true
+  nnull = sum(runif(N) < pnull)
+  null = logical(N)
+  null[1:nnull] = T
+  mumat = matrix(0, T_, N)
+  mumat[ , !null ] = Emualt
+  
+  # observables
+  rsim = emat + mumat
+  t = colMeans(rsim)/apply(rsim,2,sd)*sqrt(T_)
+  
+  # pack and output
+  data.frame(t = abs(t), null = null, mu = mumat[1, ], traw = t)
+  
+} # end e_to_t
+
+average_many_sims = function(){
+  # simulate many times
+  simmany = data.frame()
+  for (simi in 1:nsim){
+    e = esimbootc(T_)
+    tdat = e_to_tdat(pnull, Emualt, e)
+    est = estimate_fdr(t = tdat$t, tbarlist = tbarlist, nulldf = 60, null = tdat$null)  
+    est$simi = simi
+    
+    simmany = rbind(simmany, est)  
+    
+  } # end for simi
+  
+  # average across simulations
+  manysum = simmany %>% 
+    group_by(tbar) %>% 
+    summarize_at(
+      vars(2:(dim(simmany)[2])-2), mean, na.rm=F
+    )
+} # end average_many_sims
+
+# output
+manysum = average_many_sims()
+
+manysum %>% as.data.frame()
 
 
+ggplot(
+  manysum %>% 
+    select(tbar, starts_with('fdr')) %>% 
+    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
+  , aes(x=tbar, y=fdr, group = type)
+) +
+  geom_line(aes(linetype=type, color = type)) 
 
+# SIM 2: DIRECTLY SIM T DISTS BASED ON BLOCK EXTRAP OF EMP COR ====
+library(mvtnorm)
+
+# read data
+retwide = fread('../data/balanced_ret.csv')
+retmat = as.matrix(retwide) 
+colnames(retmat) = NULL
+coremp = cor(retmat) 
+Nperblock = dim(coremp)[1]
+
+# sim blocks of mv t
+
+## settings
+# model for simulation
+N = 1e5
+pnull = 0.9
+Emualt = 0.5
+vol = 5
+df = 200
+T_ = 200
+
+# number of sims, fdr estimates, other
+nsim = 10
+nulldf = df
+tbarlist = seq(2,6,0.2)
+
+## FUNCTIONS
+# function for simulating residuals' sample mean
+ebarsim = function(){
+  nblock = floor(N/Nperblock)+1
+  # ebar0 = rmvt(nblock, coremp, df)
+  # ebar0 = rmvnorm(nblock, sigma = coremp)
+  ebar0 = rnorm(N)
+  ebar = as.vector(ebar0)
+  ebar = ebar[1:N]
+} # end function
+
+# function for generating observables and nulls
+ebar_to_tdat = function(pnull,Emualt,ebar){
+
+  # adjust for true
+  nnull = sum(runif(N) < pnull)
+  null = logical(N)
+  null[1:nnull] = T
+  mu = matrix(0, N)
+  mu[!null] = Emualt
+  
+  # observables
+  t = mu/vol*sqrt(T_) + ebar
+  
+  # pack and output
+  data.frame(t = abs(t), null = null, mu = mu, traw = t)
+  
+} # end e_to_t
+
+tic = Sys.time()
+
+# test sim
+ebar = ebarsim()
+tdat = ebar_to_tdat(pnull, Emualt, ebar)
+tdat = tdat_to_tdatpub(tdat)
+# est_bias = estimate_exponential(tdat$t, 2.6)
+est_bias = estimate_mixture(tdat$t, tgood = 2.6, pnull = 0.9, shape = 2, 1)
+est = estimate_fdr(tdat$t, nulldf = 50, null = tdat$null, C = est_bias$C)
+
+Sys.time() - tic
 # ====
 
+# simulate many times
+simmany = data.frame()
+for (simi in 1:nsim){
+  print(paste0('simulation number ', simi))
+  
+  ebar = ebarsim()
+  tdat = ebar_to_tdat(pnull, Emualt, ebar)
+  tdatpub = tdat_to_tdatpub(tdat, tgood = 2.6, smarg = 0.5 )
+  
+  # actual fdr
+  fdr_actual = estimate_fdr(
+    tdat$t, tbarlist = tbarlist, null = tdat$null
+  ) %>% 
+  transmute(tbar, dr_actual = dr, fdr_actual)
+  
+  # fdrhat using exp
+  est_bias = estimate_exponential(tdat$t, 2.6)
+  fdr_exp = estimate_fdr(
+    tdatpub$t, tbarlist = tbarlist, C = est_bias$C
+  ) %>% 
+  transmute(tbar, fdrhat_exp = fdrhat)
+    
+  # fdrhat using mix
+  est_bias = estimate_mixture(tdatpub$t, tgood = 2.6, pnull = 0.9, shape = 2, 1)
+  fdr_mix = estimate_fdr(
+    tdatpub$t, tbarlist = tbarlist, C = est_bias$C
+  ) %>% 
+  transmute(tbar, fdrhat_mix = fdrhat)
+  
+  est_all = fdr_actual %>% 
+    left_join(fdr_exp, by = 'tbar') %>% 
+    left_join(fdr_mix, by = 'tbar')
+    
+  est_all$simi = simi
+  
+  simmany = rbind(simmany, est_all)  
+  
+} # end for simi
 
-
-
-# plot simulation distributions
-p1 = ggplot(
-  sim  %>% filter(abs(t)<10)
-  ,aes(x=t,fill=null)) +
-  geom_histogram(position = 'identity', alpha = 0.6)
-p2 = ggplot(
-  sim  %>% filter(pub, abs(t)<10)
-  ,aes(x=t,fill=null)) +
-  geom_histogram(position = 'identity', alpha = 0.6)
-grid.arrange(p1,p2)
-
-
-
-
-## estimate 
-source('0-functions.r')
-nsim = 1e4
-
-temp = sim %>% 
-  arrange(p) %>% 
+# average across simulations
+manysum = simmany %>% 
+  group_by(tbar) %>% 
+  summarize_at(
+    vars(2:(dim(simmany)[2])-2), mean, na.rm=F
+) %>% 
   mutate(
-    fdrexp = 2*pnorm(-t)/(row_number()/N)*fitexp$C
-    , fdrmix = 2*pnorm(-t)/(row_number()/N)*fitmix$C
+    Ndisc = dr_actual*N
   )
 
 
+# output 
+p1 = ggplot(
+  manysum %>% 
+    filter(Ndisc > 5) %>% 
+    select(tbar, starts_with('fdr')) %>% 
+    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
+  , aes(x=tbar, y=fdr, group = type)
+) +
+  geom_line(aes(linetype=type, color = type)) +
+  coord_cartesian(ylim=c(0,0.5))
+
+p2 = ggplot(
+  manysum %>% select(tbar, Ndisc)
+  , aes(x=tbar, y=Ndisc)
+) +
+  geom_line() +
+  scale_y_continuous(trans='log')
+
+grid.arrange(p1,p2,nrow=1)
+
+# SIM3: BLOCKS OF RESIDUAL BOOTSTRAP ====
+
+# problem with this, I think, is that it creates 
+# "long run" correlations, that make the null t
+# distribution under dispersed in the tails
+
+emat = ematemp[,1:2] %>% as.matrix
+Nemat = dim(emat)[2]
+Temat = dim(emat)[1]
+
+## settings
+# model for simulation
+N = 1e4
+pnull = 0.9
+Emualt = 0.5
+vol = 5
+T_ = 200
+Nperblock = Nemat
+nblock = floor(N/Nperblock)+1
+
+# number of sims, fdr estimates, other
+nsim = 10
+nulldf = 100
+tbarlist = seq(0,6,0.2)
 
 
-# ====
+## FUNCTIONS 
 
-debugSource('0-functions.r')
-
-
-bh = run_bh_plus(sim$raw$t, C=1, qlist = c(0.05, 0.10, 0.25, 0.50))
-by = run_bh_plus(sim$raw$t, C=6, qlist = c(0.05, 0.10, 0.25, 0.50))
-
-
-ggplot(data=bh$fdr, aes(x=tsort, y=fdrhat)) + geom_line()
-
-plotme = bh$fdr %>% transmute(
-  t = tsort, fdr = fdrhat, name = 'bh'
-) %>% rbind(
-  sim$sort %>% transmute(t, fdr, name = 'oracle')
-) %>% rbind(
-  by$fdr %>% transmute(
-    t = tsort, fdr = fdrhat, name = 'by'
-  ) 
-) %>% 
-filter( t<3)
-
-ggplot(data=plotme, aes(x=t, y=fdr, group=name)) +
-  geom_line(aes(linetype=name, color = name))
-
-# actual fdrs ====
-
-thurdle = seq(0,6,0.5)
-
-# add actuals
-hurdle_actual = bh$hurdle
-
-t = sim$raw$t
-null = sim$raw$null
-
-fdr_actual = numeric(length(thurdle))
-for (ti in 1:length(thurdle)){
-  idisc =t>thurdle[ti]
-  fdr_actual[ti] = mean(as.numeric(null[idisc]))
-}
-
-hurdle_actual$fdr_actual = fdr_actual
-
-hurdle_actual
-
-# ====
-
-tbarlist = c(2.0, 2.6, 3.0)
-C = 1
-
-Ns = length(tsim)
-fdis = 1:length(tbarlist)
-pval_dis = fdis
-for (tbari in seq(1,length(tbarlist))){
-  tbar = tbarlist[tbari]
+estatsim = function(){
   
-  fdis[tbari] = sum(tsim>tbar)/Ns
-  pval_dis[tbari] = 2*pnorm(-tbar)
-}
+  # first draw a ton of residuals
+  imonth  = sample(1:Temat, nblock*T_ , replace = T) # draw list of months
+  esim = emat[imonth, ] %>% as.matrix
+  
+  # average within blocks ====
+  tic = Sys.time()
+  ebar = numeric(nblock*Nemat)
+  evol = ebar
+  for (blocki in 1:nblock){
+    tstart = (blocki-1)*T_ + 1
+    tend = tstart + T_ - 1
+    
+    Nstart = (blocki-1)*Nemat + 1
+    Nend = Nstart + Nemat - 1
+    ebar[Nstart:Nend] = colMeans(esim[tstart:tend, ])
+    evol[Nstart:Nend] = sqrt(colMeans(esim[tstart:tend, ]^2))
+  }
+  
+  # clean and output
+  estat = data.frame(
+    bar = ebar[1:N]
+    , vol = evol[1:N]
+  )
+} # end ebarsim
 
 
-fdrhat = pval_dis/fdis*C
-fdrhat
-fdis
-pval_dis
-
-# ====
-
-
-
-# BKY ==== 
-
-q = 0.05
-q2 = q/(1+q)
-
-# step 1: use linear step up using q2
-Ns = length(tsim)
-psort = sort(2*pnorm(-tsim))
-fdrhat = psort/(1:Ns/Ns)
-istar2 = sum(fdrhat < q2)
-
-# step 2: estimate n null
-Nnull = Ns - istar2
-pnullhat = Nnull/Ns
-
-# step 3: use linear step up with qstar
-qstar = q2/pnullhat
-istarstar = sum(fdrhat < qstar)
-
-psort[istarstar]
+# function for generating observables and nulls
+estat_to_tdat = function(pnull,Emualt){
+  
+  # adjust for true
+  nnull = sum(runif(N) < pnull)
+  null = logical(N)
+  null[1:nnull] = T
+  mu = matrix(0, N)
+  mu[!null] = Emualt
+  
+  # observables
+  t = (mu + estat$bar)/estat$vol*sqrt(T_)
+  
+  # pack and output
+  data.frame(t = abs(t), null = null, mu = mu, traw = t)
+  
+} # end e_to_t
 
 
-pnullhat
+average_many_sims = function(){
+  # simulate many times
+  simmany = data.frame()
+  for (simi in 1:nsim){
+    estat = estatsim()
+    tdat = estat_to_tdat(pnull, Emualt)
+    est = estimate_fdr(t = tdat$t, tbarlist = tbarlist, nulldf = nulldf, null = tdat$null)  
+    est$simi = simi
+    
+    simmany = rbind(simmany, est)  
+    
+  } # end for simi
+  
+  # average across simulations
+  manysum = simmany %>% 
+    group_by(tbar) %>% 
+    summarize_at(
+      vars(2:(dim(simmany)[2])-2), mean, na.rm=F
+    )
+} # end average_many_sims
+
+manysum = average_many_sims()
 
 
+p1 = ggplot(
+  manysum %>% 
+    select(tbar, starts_with('fdr')) %>% 
+    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
+  , aes(x=tbar, y=fdr, group = type)
+) +
+  geom_line(aes(linetype=type, color = type)) 
+
+p2 = ggplot(
+  tdat %>% filter(null) %>% transmute(traw, group = 'sim') %>% 
+    rbind(
+      data.frame(traw = rnorm(N), group = 'normal')
+    )
+  , aes(x=traw, fill=group)) +
+  geom_histogram(alpha = 0.6, position = 'identity')
+
+
+grid.arrange(p1,p2)

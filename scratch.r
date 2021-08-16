@@ -44,8 +44,8 @@ simulate = function(N,pnull,shape,scale,loc){
   # mu[1:round(Nalt/2)] = -mu[1:round(Nalt/2)]
   
   # simulate returns
-  i = sample(1:Nemp,N,replace=T)
-  tau = sample(1:nrow(emat), nmonth, replace = T)
+  i = sample(1:Nemp,N,replace=T_)
+  tau = sample(1:nrow(emat), nmonth, replace = T_)
   esim1 = emat[tau, ] # check me
   esim  = esim1[   ,i]
   
@@ -145,7 +145,7 @@ Nemp = dim(emat)[2]
 t = numeric(N)*NA_real_
 for (booti in 1:N){
   iemp  = sample(1:Nemp,1) # pick a random empirical strategy
-  r = sample(emat[,iemp],nmonth,T) # pick some random months
+  r = sample(emat[,iemp],nmonth,T_) # pick some random months
   t[booti] = mean(r)/sd(r)*sqrt(nmonth)
 }
 
@@ -177,7 +177,7 @@ Nemp = dim(emat)[2]
 Temp = dim(emat)[1]
 
 # draw random set of months
-tboot = sample(1:Temp, nmonth, replace = T)
+tboot = sample(1:Temp, nmonth, replace = T_)
 
 t = numeric(N)*NA_real_
 for (booti in 1:N){
@@ -223,7 +223,7 @@ Nemp = dim(emat)[2]
 Temp = dim(emat)[1]
 
 # draw random set of months
-tboot = sample(1:Temp, nmonth, replace = T)
+tboot = sample(1:Temp, nmonth, replace = T_)
 
 t = numeric(N)*NA_real_
 for (booti in 1:N){
@@ -273,7 +273,7 @@ nmonth = 30
 
 tblock = matrix(NA , nrow = nblock, ncol = Nemp)
 for (blocki in 1:nblock){
-  imonth  = sample(1:Temp,nmonth, replace = T) # draw list of months
+  imonth  = sample(1:Temp,nmonth, replace = T_) # draw list of months
   eboot = emat[imonth, ]  # find returns
   tblock[blocki, ] = colMeans(eboot)/apply(eboot,2,sd)*sqrt(nmonth) 
 }
@@ -323,19 +323,19 @@ mualt = 0.5
 # discoveries for t>3.  note this is not an issue with empirical data
 # because we have a lot of discoveries for t>3
 # Nsim = Nemp
-# imonth  = sample(1:Temp,Tsim, replace = T) # draw list of months
+# imonth  = sample(1:Temp,Tsim, replace = T_) # draw list of months
 # esim = emat[imonth, ]
 
 ## bootstrap block mvnormal
 Nsim = 1000
 rho = cor(emat)
 esim = mvrnorm(n=Nsim*Tsim , numeric(Nemp), rho)
-esim = matrix(esim, Tsim, Nsim, byrow = T)
+esim = matrix(esim, Tsim, Nsim, byrow = T_)
 
 
 nnull = sum(runif(Nsim) < pnull)
 null = logical(Nsim)
-null[1:nnull] = T
+null[1:nnull] = T_
 musim = matrix(0, Tsim, Nsim)
 musim[ , !null ] = mualt
 
@@ -345,13 +345,6 @@ tsim = colMeans(rsim)/apply(rsim,2,sd)*sqrt(Tsim)
 tsim = abs(tsim)
 
 
-# find actual fdrs
-tbarlist = seq(0,3,0.2)
-fdrlist = numeric(length(tbarlist))*NA
-for (ti in 1:length(tbarlist)){
-  i = tsim>tbarlist[ti]
-  fdrlist[ti] = mean(null[i])
-}
 
 # estimated FDRs
 Fhatall = ecdf(tsim)
@@ -374,3 +367,25 @@ ggplot(
 ) +
   geom_line(aes(linetype=type))
 
+
+
+# ====
+N = 1e4
+T_ = 100
+p = 0.5
+
+x = runif(N*T_) < p
+x = matrix(x, nrow = T_)
+
+e = x - p
+ebar = colMeans(e) 
+evol = sqrt(colMeans(e^2))
+
+
+t = ebar/evol*sqrt(T_)
+
+hist(t)
+
+
+qqnorm(t)
+qqline(t)
