@@ -13,7 +13,7 @@ library(boot)
 library(e1071)
 library(truncdist)
 library(gridExtra)
-
+source('0-functions.r')
 ret = fread('../data/clean_ret.csv')
 
 # univariate
@@ -42,14 +42,19 @@ sigma = 1
 fitexp = estimate_exponential(t_emp,tgood)
 fitmix = estimate_mixture(t_emp,tgood,pnull,shape,sigma)
 
+fitexp
+
+fitmix
+
 
 # ==== FIGURES ====
 source('0-functions.r')
 nsim = 1e5
 
 ## create data frame with all groups
-t_exp = rexp(nsim,1/fitexp$scalehat)
-t_mix = rmix(nsim,fitmix$pnull,fitmix$shape,fitmix$scalehat,fitmix$sigma)
+t_exp = simmix(nsim,pnull=0,shape=1,fitexp$scalehat,sigma=1)$t
+t_mix = simmix(nsim,fitmix$pnull,shape=fitmix$shape,fitmix$scalehat,fitmix$sigma)$t
+
 
 datall = data.frame(t = t_emp, group = 'emp') %>% 
   rbind(
@@ -74,7 +79,8 @@ hall = datall %>%
   mutate(
     density_good = density/Pr_good
   )
-  
+
+
 ## plot all
 ggplot(hall, aes(x=tmid, y=density_good, fill=group)) +
   geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = T) 

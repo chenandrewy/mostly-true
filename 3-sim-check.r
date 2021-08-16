@@ -1,8 +1,8 @@
 # 2021 08 Andrew
 # Simulation verification
 
-rm(list=ls())
 # ENVIRONMENT ====
+rm(list=ls())
 library(data.table)
 library(tidyverse)
 library(ggplot2)
@@ -186,9 +186,9 @@ est_bias = estimate_mixture(tdat$t, tgood = 2.6, pnull = 0.9, shape = 2, 1)
 est = estimate_fdr(tdat$t, nulldf = 50, null = tdat$null, C = est_bias$C)
 
 Sys.time() - tic
-# ====
 
-# simulate many times
+
+# simulate many times ====
 simmany = data.frame()
 for (simi in 1:nsim){
   print(paste0('simulation number ', simi))
@@ -260,20 +260,16 @@ grid.arrange(p1,p2,nrow=1)
 
 # SIM3: BLOCKS OF RESIDUAL BOOTSTRAP ====
 
-# problem with this, I think, is that it creates 
-# "long run" correlations, that make the null t
-# distribution under dispersed in the tails
 
-emat = ematemp[,1:2] %>% as.matrix
+emat = ematemp 
 Nemat = dim(emat)[2]
 Temat = dim(emat)[1]
 
 ## settings
 # model for simulation
 N = 1e4
-pnull = 0.9
+pnull = 0.5
 Emualt = 0.5
-vol = 5
 T_ = 200
 Nperblock = Nemat
 nblock = floor(N/Nperblock)+1
@@ -292,7 +288,7 @@ estatsim = function(){
   imonth  = sample(1:Temat, nblock*T_ , replace = T) # draw list of months
   esim = emat[imonth, ] %>% as.matrix
   
-  # average within blocks ====
+  # average within blocks 
   tic = Sys.time()
   ebar = numeric(nblock*Nemat)
   evol = ebar
@@ -315,7 +311,7 @@ estatsim = function(){
 
 
 # function for generating observables and nulls
-estat_to_tdat = function(pnull,Emualt){
+estat_to_tdat = function(pnull,Emualt,estat){
   
   # adjust for true
   nnull = sum(runif(N) < pnull)
@@ -334,15 +330,41 @@ estat_to_tdat = function(pnull,Emualt){
 
 
 average_many_sims = function(){
-  # simulate many times
   simmany = data.frame()
   for (simi in 1:nsim){
-    estat = estatsim()
-    tdat = estat_to_tdat(pnull, Emualt)
-    est = estimate_fdr(t = tdat$t, tbarlist = tbarlist, nulldf = nulldf, null = tdat$null)  
-    est$simi = simi
+    print(paste0('simulation number ', simi))
     
-    simmany = rbind(simmany, est)  
+    estat = estatsim()
+    tdat = estat_to_tdat(pnull, Emualt, estat)
+    tdatpub = tdat_to_tdatpub(tdat, tgood = 2.6, smarg = 0.5 )
+    
+    # actual fdr
+    fdr_actual = estimate_fdr(
+      tdat$t, tbarlist = tbarlist, null = tdat$null
+    ) %>% 
+      transmute(tbar, dr_actual = dr, fdr_actual)
+    
+    # fdrhat using exp
+    est_bias = estimate_exponential(tdat$t, 2.6)
+    fdr_exp = estimate_fdr(
+      tdatpub$t, tbarlist = tbarlist, C = est_bias$C
+    ) %>% 
+      transmute(tbar, fdrhat_exp = fdrhat)
+    
+    # fdrhat using mix
+    est_bias = estimate_mixture(tdatpub$t, tgood = 2.6, pnull = 0.95, shape = 2, 1)
+    fdr_mix = estimate_fdr(
+      tdatpub$t, tbarlist = tbarlist, C = est_bias$C
+    ) %>% 
+      transmute(tbar, fdrhat_mix = fdrhat)
+    
+    est_all = fdr_actual %>% 
+      left_join(fdr_exp, by = 'tbar') %>% 
+      left_join(fdr_mix, by = 'tbar')
+    
+    est_all$simi = simi
+    
+    simmany = rbind(simmany, est_all)  
     
   } # end for simi
   
@@ -351,27 +373,54 @@ average_many_sims = function(){
     group_by(tbar) %>% 
     summarize_at(
       vars(2:(dim(simmany)[2])-2), mean, na.rm=F
+    ) %>% 
+    mutate(
+      Ndisc = dr_actual*N
     )
+  
 } # end average_many_sims
 
+
+## DO STUFF 
 manysum = average_many_sims()
 
 
-p1 = ggplot(
+ggplot(
   manysum %>% 
     select(tbar, starts_with('fdr')) %>% 
     pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
   , aes(x=tbar, y=fdr, group = type)
 ) +
-  geom_line(aes(linetype=type, color = type)) 
-
-p2 = ggplot(
-  tdat %>% filter(null) %>% transmute(traw, group = 'sim') %>% 
-    rbind(
-      data.frame(traw = rnorm(N), group = 'normal')
-    )
-  , aes(x=traw, fill=group)) +
-  geom_histogram(alpha = 0.6, position = 'identity')
+  geom_line(aes(linetype=type, color = type)) +
+  coord_cartesian(ylim = c(0,1))
 
 
-grid.arrange(p1,p2)
+
+# SIM 4: SUPER FAST SUPER SIMPLE ====
+
+# for fast simple testing
+N = 1e7
+pnull = 0.95
+Et_alt = 0.25/2.7*sqrt(184)
+Nalt = floor(N*(1-pnull))+1
+
+# simulate
+e = rnorm(N)
+null = runif(N) < pnull
+Et = numeric(N)
+Et[!null] = Et_alt
+t = Et + e
+t = abs(t)
+
+
+est = estimate_fdr(t=t, tbarlist = tbarlist, null = null)
+
+
+ggplot(
+  est %>% 
+    select(tbar, starts_with('fdr')) %>% 
+    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
+  , aes(x=tbar, y=fdr, group = type)
+) +
+  geom_line(aes(linetype=type, color = type)) +
+  coord_cartesian(ylim = c(0,1))

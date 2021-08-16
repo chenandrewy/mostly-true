@@ -123,7 +123,7 @@ print(objhat)
 
 # ==== MIXTURE ESTIMATION ====
 shape = 3
-n = 10000
+n = 1e6
 tgood = 2.6
 pnull = 0.95
 

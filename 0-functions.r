@@ -156,7 +156,7 @@ estimate_mixture = function(
 # and to keep that density near the data a higher scale is needed
 # to offset it
 
-# note sigma and shape are mini-globals
+# note sigma and shape are globals within this function
 
 
 ## setup
@@ -196,7 +196,7 @@ minme = function(scale){
 est = optimize(minme,c(0.1/shape,6/shape))
 
 # find Pr(|t|>tgood)
-tempd = function(t){dmix(t,pnull,1/est$minimum)}
+tempd = function(t){dmix(t,pnull,est$minimum)}
 Pr_tgood = integrate(tempd,tgood,Inf)$value
 
 ## pack results
