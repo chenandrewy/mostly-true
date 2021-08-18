@@ -90,7 +90,7 @@ histcomp = function(
   plotme = rbind(
     data.frame(
       t = hemp$mids
-      , f = hemp$density / sum(dat1>tgood) * length(t_emp)
+      , f = hemp$density / sum(dat1>tgood) * length(dat1)
       , group = label1
     )
     , data.frame(
@@ -227,4 +227,10 @@ estimate_exponential = function(
     , Pr_tgood = Pr_tgood
     , C = 1/Pr_tgood
   )
+}
+
+# TOOLS ====
+
+detach_all = function(){
+  invisible(lapply(paste0('package:', names(sessionInfo()$otherPkgs)), detach, character.only=TRUE, unload=TRUE))
 }

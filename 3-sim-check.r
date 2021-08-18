@@ -6,24 +6,22 @@ rm(list=ls())
 library(data.table)
 library(tidyverse)
 library(ggplot2)
+library(ggthemes)
 library(gridExtra)
+library(latex2exp)
 source('0-functions.r')
 
-# full data stats
-ret = fread('../data/clean_ret.csv')
-signalsum = ret %>% 
-  filter(insamp) %>% 
-  group_by(signalname) %>% 
-  summarize(
-    rbar = mean(ret)
-    , vol = sd(ret)
-    , nmonth = n()
-    , t = rbar/vol*sqrt(nmonth)
-  )
+# load data
+load('../data/emp_data.Rdata')
 
 # balanced data
-retwide = fread('../data/balanced_ret.csv')
-retmat = as.matrix(retwide)
+retwide = pivot_wider(
+  emp_ret
+  , c(signalname,date,ret), names_from = signalname, values_from = ret
+) %>% 
+  select(-date) %>% 
+  filter(complete.cases(.))
+retmat = as.matrix(retwide) 
 
 # generate residuals
 rbar = colMeans(retmat) %>% as.matrix() %>% t()
@@ -50,239 +48,11 @@ tdat_to_tdatpub = function(tdat, tbad=1.96, tgood=2.6, smarg=0.5, sbar=1){
 } # end function 
 
 
-
-# SIM1: RESIDUAL BOOTSTRAP ====
-nsim = 100
-pnull = 0.9
-Emualt = 0.5
-T_ = 200
-tbarlist = seq(0,5,0.25)
-emat = ematemp
-
-## functions 
-esimbootc = function(T_){
-  imonth  = sample(1:Temp,T_, replace = T) # draw list of months
-  esim = emat[imonth, ]
-}
-
-e_to_tdat = function(pnull,Emualt,emat){
-  T_ = dim(emat)[1]
-  N = dim(emat)[2]
+estatsim = function(N, T_){
+  # emat is a global
   
-  # adjust for true
-  nnull = sum(runif(N) < pnull)
-  null = logical(N)
-  null[1:nnull] = T
-  mumat = matrix(0, T_, N)
-  mumat[ , !null ] = Emualt
-  
-  # observables
-  rsim = emat + mumat
-  t = colMeans(rsim)/apply(rsim,2,sd)*sqrt(T_)
-  
-  # pack and output
-  data.frame(t = abs(t), null = null, mu = mumat[1, ], traw = t)
-  
-} # end e_to_t
-
-average_many_sims = function(){
-  # simulate many times
-  simmany = data.frame()
-  for (simi in 1:nsim){
-    e = esimbootc(T_)
-    tdat = e_to_tdat(pnull, Emualt, e)
-    est = estimate_fdr(t = tdat$t, tbarlist = tbarlist, nulldf = 60, null = tdat$null)  
-    est$simi = simi
-    
-    simmany = rbind(simmany, est)  
-    
-  } # end for simi
-  
-  # average across simulations
-  manysum = simmany %>% 
-    group_by(tbar) %>% 
-    summarize_at(
-      vars(2:(dim(simmany)[2])-2), mean, na.rm=F
-    )
-} # end average_many_sims
-
-# output
-manysum = average_many_sims()
-
-manysum %>% as.data.frame()
-
-
-ggplot(
-  manysum %>% 
-    select(tbar, starts_with('fdr')) %>% 
-    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
-  , aes(x=tbar, y=fdr, group = type)
-) +
-  geom_line(aes(linetype=type, color = type)) 
-
-# SIM 2: DIRECTLY SIM T DISTS BASED ON BLOCK EXTRAP OF EMP COR ====
-library(mvtnorm)
-
-# read data
-retwide = fread('../data/balanced_ret.csv')
-retmat = as.matrix(retwide) 
-colnames(retmat) = NULL
-coremp = cor(retmat) 
-Nperblock = dim(coremp)[1]
-
-# sim blocks of mv t
-
-## settings
-# model for simulation
-N = 1e5
-pnull = 0.9
-Emualt = 0.5
-vol = 5
-df = 200
-T_ = 200
-
-# number of sims, fdr estimates, other
-nsim = 10
-nulldf = df
-tbarlist = seq(2,6,0.2)
-
-## FUNCTIONS
-# function for simulating residuals' sample mean
-ebarsim = function(){
+  Nperblock = dim(emat)[2]
   nblock = floor(N/Nperblock)+1
-  # ebar0 = rmvt(nblock, coremp, df)
-  # ebar0 = rmvnorm(nblock, sigma = coremp)
-  ebar0 = rnorm(N)
-  ebar = as.vector(ebar0)
-  ebar = ebar[1:N]
-} # end function
-
-# function for generating observables and nulls
-ebar_to_tdat = function(pnull,Emualt,ebar){
-
-  # adjust for true
-  nnull = sum(runif(N) < pnull)
-  null = logical(N)
-  null[1:nnull] = T
-  mu = matrix(0, N)
-  mu[!null] = Emualt
-  
-  # observables
-  t = mu/vol*sqrt(T_) + ebar
-  
-  # pack and output
-  data.frame(t = abs(t), null = null, mu = mu, traw = t)
-  
-} # end e_to_t
-
-tic = Sys.time()
-
-# test sim
-ebar = ebarsim()
-tdat = ebar_to_tdat(pnull, Emualt, ebar)
-tdat = tdat_to_tdatpub(tdat)
-# est_bias = estimate_exponential(tdat$t, 2.6)
-est_bias = estimate_mixture(tdat$t, tgood = 2.6, pnull = 0.9, shape = 2, 1)
-est = estimate_fdr(tdat$t, nulldf = 50, null = tdat$null, C = est_bias$C)
-
-Sys.time() - tic
-
-
-# simulate many times ====
-simmany = data.frame()
-for (simi in 1:nsim){
-  print(paste0('simulation number ', simi))
-  
-  ebar = ebarsim()
-  tdat = ebar_to_tdat(pnull, Emualt, ebar)
-  tdatpub = tdat_to_tdatpub(tdat, tgood = 2.6, smarg = 0.5 )
-  
-  # actual fdr
-  fdr_actual = estimate_fdr(
-    tdat$t, tbarlist = tbarlist, null = tdat$null
-  ) %>% 
-  transmute(tbar, dr_actual = dr, fdr_actual)
-  
-  # fdrhat using exp
-  est_bias = estimate_exponential(tdat$t, 2.6)
-  fdr_exp = estimate_fdr(
-    tdatpub$t, tbarlist = tbarlist, C = est_bias$C
-  ) %>% 
-  transmute(tbar, fdrhat_exp = fdrhat)
-    
-  # fdrhat using mix
-  est_bias = estimate_mixture(tdatpub$t, tgood = 2.6, pnull = 0.9, shape = 2, 1)
-  fdr_mix = estimate_fdr(
-    tdatpub$t, tbarlist = tbarlist, C = est_bias$C
-  ) %>% 
-  transmute(tbar, fdrhat_mix = fdrhat)
-  
-  est_all = fdr_actual %>% 
-    left_join(fdr_exp, by = 'tbar') %>% 
-    left_join(fdr_mix, by = 'tbar')
-    
-  est_all$simi = simi
-  
-  simmany = rbind(simmany, est_all)  
-  
-} # end for simi
-
-# average across simulations
-manysum = simmany %>% 
-  group_by(tbar) %>% 
-  summarize_at(
-    vars(2:(dim(simmany)[2])-2), mean, na.rm=F
-) %>% 
-  mutate(
-    Ndisc = dr_actual*N
-  )
-
-
-# output 
-p1 = ggplot(
-  manysum %>% 
-    filter(Ndisc > 5) %>% 
-    select(tbar, starts_with('fdr')) %>% 
-    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
-  , aes(x=tbar, y=fdr, group = type)
-) +
-  geom_line(aes(linetype=type, color = type)) +
-  coord_cartesian(ylim=c(0,0.5))
-
-p2 = ggplot(
-  manysum %>% select(tbar, Ndisc)
-  , aes(x=tbar, y=Ndisc)
-) +
-  geom_line() +
-  scale_y_continuous(trans='log')
-
-grid.arrange(p1,p2,nrow=1)
-
-# SIM3: BLOCKS OF RESIDUAL BOOTSTRAP ====
-
-
-emat = ematemp 
-Nemat = dim(emat)[2]
-Temat = dim(emat)[1]
-
-## settings
-# model for simulation
-N = 1e4
-pnull = 0.5
-Emualt = 0.5
-T_ = 200
-Nperblock = Nemat
-nblock = floor(N/Nperblock)+1
-
-# number of sims, fdr estimates, other
-nsim = 10
-nulldf = 100
-tbarlist = seq(0,6,0.2)
-
-
-## FUNCTIONS 
-
-estatsim = function(){
   
   # first draw a ton of residuals
   imonth  = sample(1:Temat, nblock*T_ , replace = T) # draw list of months
@@ -311,7 +81,7 @@ estatsim = function(){
 
 
 # function for generating observables and nulls
-estat_to_tdat = function(pnull,Emualt,estat){
+estat_to_tdat = function(N,pnull,Emualt,estat){
   
   # adjust for true
   nnull = sum(runif(N) < pnull)
@@ -329,14 +99,18 @@ estat_to_tdat = function(pnull,Emualt,estat){
 } # end e_to_t
 
 
-average_many_sims = function(){
+average_many_sims = function(
+  N, T_, pnull, Emualt, tgood, smarg
+  , nsim 
+  , tgoodhat, pnullhat, shapehat
+){
   simmany = data.frame()
   for (simi in 1:nsim){
     print(paste0('simulation number ', simi))
     
-    estat = estatsim()
-    tdat = estat_to_tdat(pnull, Emualt, estat)
-    tdatpub = tdat_to_tdatpub(tdat, tgood = 2.6, smarg = 0.5 )
+    estat = estatsim(N, T_)
+    tdat = estat_to_tdat(N, pnull, Emualt, estat)
+    tdatpub = tdat_to_tdatpub(tdat, tgood = tgood, smarg = smarg )
     
     # actual fdr
     fdr_actual = estimate_fdr(
@@ -345,16 +119,16 @@ average_many_sims = function(){
       transmute(tbar, dr_actual = dr, fdr_actual)
     
     # fdrhat using exp
-    est_bias = estimate_exponential(tdat$t, 2.6)
+    est_bias = estimate_exponential(tdatpub$t, tgoodhat)
     fdr_exp = estimate_fdr(
-      tdatpub$t, tbarlist = tbarlist, C = est_bias$C
+      tdatpub$t, tbarlist = tbarlist, C = est_bias$C, nulldf = nulldf
     ) %>% 
       transmute(tbar, fdrhat_exp = fdrhat)
     
     # fdrhat using mix
-    est_bias = estimate_mixture(tdatpub$t, tgood = 2.6, pnull = 0.95, shape = 2, 1)
+    est_bias = estimate_mixture(tdatpub$t, tgood = tgoodhat, pnull = pnullhat, shape = shapehat, 1)
     fdr_mix = estimate_fdr(
-      tdatpub$t, tbarlist = tbarlist, C = est_bias$C
+      tdatpub$t, tbarlist = tbarlist, C = est_bias$C, nulldf = nulldf
     ) %>% 
       transmute(tbar, fdrhat_mix = fdrhat)
     
@@ -381,46 +155,259 @@ average_many_sims = function(){
 } # end average_many_sims
 
 
-## DO STUFF 
-manysum = average_many_sims()
 
 
-ggplot(
-  manysum %>% 
+
+# SELECTED SETTINGS FOR ILLUSTRATION ====
+
+## BASELINE SETTINGS
+
+# residuals
+emat = ematemp 
+Nemat = dim(emat)[2]
+Temat = dim(emat)[1]
+
+# model for simulation
+N = 1e4
+T_ = 200
+pnull_small  = 0.5
+Emualt_small = 0.5
+
+pnull_large = 0.99
+Emualt_large = 0.25
+
+# number of sims, fdr estimates, other
+nsim = 10
+nulldf = 100
+tbarlist = seq(0,6,0.2)
+tgoodhat = 2.6
+pnullhat = 0.9
+shapehat = 2
+
+# plot settings
+custom_plot = function(manysum){
+  manysum_plot = manysum %>% 
     select(tbar, starts_with('fdr')) %>% 
-    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
-  , aes(x=tbar, y=fdr, group = type)
-) +
-  geom_line(aes(linetype=type, color = type)) +
-  coord_cartesian(ylim = c(0,1))
+    mutate_at(
+      .vars = vars(c(-tbar))
+      , .funs = ~round(.*100,1)
+    ) %>% 
+    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr') %>% 
+    mutate(
+      type = factor(
+        type
+        , levels = c("fdr_actual","fdrhat_mix","fdrhat_exp")
+        , labels = c('Actual','Est: Conservative','Est: Exponential')
+      )
+    )
+  
+  ggplot(
+    manysum_plot
+    , aes(x=tbar, y=fdr, group = type)
+  ) +
+    geom_line(aes(linetype=type, color = type),size = 2.5) +
+    coord_cartesian(ylim = c(0,100)) +
+    scale_linetype_manual(values=c("dashed", "solid", "dotted")) +
+    scale_color_manual(values=c("#619CFF","#00BA38", "#F8766D")) +
+    theme_economist_white(gray_bg = FALSE) + 
+    theme(
+      axis.title = element_text(size = 40)
+      , axis.text = element_text(size = 30)      
+      , legend.title = element_blank()
+      , legend.text = element_text(size = 30)
+      , legend.background = element_rect(colour = 'black', fill = 'white', linetype = 'solid')
+    )  +
+    labs(
+      x = TeX('\\bar{t}')
+      , y = TeX('FDR for $|t_i|>\\bar{t}$ (\\%)')
+    )  +
+    theme(
+      legend.position = c(70,80)/100
+      , legend.key.width = unit(3,'cm')
+    )
+  
+} # end custom_plot
+
+## EXAMPLES: CORRECT TGOOD ==== 
+tgood = 2.6
+smarg = 0.5
+
+
+# EX 1: SMALL FDR 
+# show off why fdrhat_exp is relevant
+manysum = average_many_sims(
+  N, T_, pnull = pnull_small, Emualt = Emualt_small,
+  tgood = tgood, smarg = smarg
+  , nsim = 10
+  , tgoodhat, pnullhat, shapehat
+  )
+
+custom_plot(manysum)
+
+ggsave(filename = '../results/sim_ex_smallfdr.pdf', width = 10, height = 8)
+
+
+# EX 2: LARGE FDR 
+# show off how fdr_hat mix works even when most discoveries are false
+manysum = average_many_sims(
+  N, T_, pnull = pnull_large, Emualt = Emualt_large
+  , tgood = tgood, smarg = smarg
+  , nsim = 100
+  , tgoodhat, pnullhat, shapehat
+)
+
+custom_plot(manysum) +
+  theme(
+    legend.position = 'none'
+  )
+
+ggsave(filename = '../results/sim_ex_largefdr.pdf', width = 10, height = 8)
 
 
 
-# SIM 4: SUPER FAST SUPER SIMPLE ====
 
-# for fast simple testing
-N = 1e7
-pnull = 0.95
-Et_alt = 0.25/2.7*sqrt(184)
-Nalt = floor(N*(1-pnull))+1
+## EXAMPLES: MISSPECIFIED  ====
+tgood = 5.0
+smarg = 0.25
 
-# simulate
-e = rnorm(N)
-null = runif(N) < pnull
-Et = numeric(N)
-Et[!null] = Et_alt
-t = Et + e
-t = abs(t)
+# SMALL FDR
+manysum = average_many_sims(
+  N, T_, pnull = pnull_small, Emualt = Emualt_small,
+  tgood = tgood, smarg = smarg
+  , nsim = 10
+  , tgoodhat, pnullhat, shapehat
+)
 
 
-est = estimate_fdr(t=t, tbarlist = tbarlist, null = null)
+custom_plot(manysum)
+
+ggsave(filename = '../results/sim_ex_mis_smallfdr.pdf', width = 10, height = 8)
+
+# LARGE FDR 
+# show off how fdr_hat mix works even when most discoveries are false
+manysum = average_many_sims(
+  N, T_, pnull = pnull_large, Emualt = Emualt_large
+  , tgood = tgood, smarg = smarg
+  , nsim = 100
+  , tgoodhat, pnullhat, shapehat
+)
+
+custom_plot(manysum) +
+  theme(
+    legend.position = 'none'
+  )
+
+ggsave(filename = '../results/sim_ex_mis_largefdr.pdf', width = 10, height = 8)
 
 
-ggplot(
-  est %>% 
-    select(tbar, starts_with('fdr')) %>% 
-    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
-  , aes(x=tbar, y=fdr, group = type)
-) +
-  geom_line(aes(linetype=type, color = type)) +
-  coord_cartesian(ylim = c(0,1))
+
+
+## WHY MISSPECIFICATION DOES SO LITTLE ====
+# if pnull is large, the decay in t-stats past 2.6
+# is so sharp it dominates any kind of bias
+
+
+tgood_real = 2.6
+smarg_real = 0.5
+tgood_cray = 5.0
+smarg_cray = 0.25
+
+estat = estatsim(N, T_)
+tdat = estat_to_tdat(N, pnull=pnull_small,  Emualt=Emualt_small, estat)
+
+tdatpub = tdat_to_tdatpub(tdat, tgood = tgood_real, smarg = smarg_real )
+t_real = tdatpub$t
+fit_real = estimate_mixture(t_real, tgood = tgoodhat, pnull = pnullhat, shape = shapehat, 1)
+
+tdatpub = tdat_to_tdatpub(tdat, tgood = tgood_cray, smarg = smarg_cray )
+t_cray = tdatpub$t
+fit_cray = estimate_mixture(t_cray, tgood = tgoodhat, pnull = pnullhat, shape = shapehat, 1)
+
+histcomp(t_real,t_cray,edge=seq(2,8,0.2))
+
+mean(t_real[t_real>2.6])
+mean(t_cray[t_cray>2.6])
+
+
+# simulate bias fit
+nsim = 1e5
+fitmix = fit_real
+t_mix = simmix(nsim,fitmix$pnull,shape=fitmix$shape,fitmix$scalehat,fitmix$sigma)$t
+
+t_all = data.frame(
+  t = t_real, group = 'data_biased'
+) %>% 
+  rbind(
+    data.frame(
+      t = t_mix, group = 'fit_mix'
+    )
+  )
+
+edge = seq(0,8,0.2)
+t_sum = t_all %>% 
+  filter(t>edge[1],t<edge[length(edge)]) %>% 
+  group_by(group) %>% 
+  summarize(
+    density = hist(t,edge)$density
+    , mid = hist(t,edge)$mids
+  )
+
+
+# ====
+
+
+
+
+# output to console
+fitexp %>% t()
+fitmix %>% t()
+
+
+## create data frame with all groups
+datall = data.frame(t = tdatpub$t, group = 'emp') %>% 
+  rbind(
+    data.frame(t = t_exp, group = 'exp')
+  ) %>% 
+  rbind(
+    data.frame(t = t_mix, group = 'mix')
+  )
+
+edge = seq(0,6,0.2)
+hall = datall %>% 
+  filter(t>min(edge), t<max(edge)) %>% 
+  group_by(group) %>% 
+  summarize(
+    tmid = hist(t,edge)$mid
+    , density = hist(t,edge)$density
+  ) %>% 
+  left_join(
+    datall %>% group_by(group) %>% summarise(Pr_good = sum(t>tgoodhat)/n())
+  ) %>% 
+  mutate(
+    density_good = density/Pr_good
+  )
+
+
+## plot all
+ggplot(hall, aes(x=tmid, y=density_good, fill=group)) +
+  geom_bar(stat='identity', position='dodge',alpha=0.6, show.legend = T)  +
+  coord_cartesian(ylim=c(0,20))
+
+
+mean(tdatpub$t[tdatpub$t > tgoodhat])
+
+# ====
+
+# ggsave(filename = '../results/Pr_good_fit_all.pdf', width = 10, height = 8)
+
+## plot t > 2 only
+p2 = ggplot(
+  hall 
+  , aes(x=tmid, y=density_good, fill=group)) +
+  geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = T)  +
+  coord_cartesian(ylim=c(0,1.5))
+
+# ggsave(filename = '../results/Pr_good_fit_zoom.pdf', width = 10, height = 8)
+
+
+grid.arrange(p1,p2)
