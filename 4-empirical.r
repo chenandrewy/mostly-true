@@ -9,8 +9,9 @@ library(RColorBrewer)
 library(lubridate)
 library(boot)
 library(e1071)
-library(truncdist)
+library(ggthemes)
 library(gridExtra)
+library(latex2exp)
 library(Hmisc)
 
 source('0-functions.r')
@@ -22,7 +23,6 @@ tdatpub = emp_sum
 # ESTIMATE FDR ====
 
 # settings
-tbarlist = seq(0,6,0.25) 
 tbarlist = quantile(tdatpub$t, seq(0.1,0.9,0.1))
 
 # estimate bias
@@ -32,7 +32,12 @@ est_yz = list(
 )
 est_exp = estimate_exponential(tdatpub$t, 2.6)
 
+
+# PLOT ====
+
 # fdr calculations
+tbarlist = seq(1,6,0.25) 
+
 fdr = estimate_fdr(
   tdatpub$t, tbarlist = tbarlist, C = 1
 ) %>% 
@@ -47,18 +52,50 @@ fdr = estimate_fdr(
     , .funs = ~round(.*100,1)
   ) 
 
+# prep plot
+plotme = fdr %>% 
+  select(tbar, starts_with('fdr'), -fdr_bh) %>% 
+  pivot_longer(-tbar, names_to = 'type', values_to = 'fdr') %>% 
+  mutate(
+    type = factor(
+      type
+      , levels = c("fdryz","fdrmix","fdrexp")
+      , labels = c('Yan-Zheng Bound','Conservative Mix','Exponential')
+    )
+  )
 
-# PLOT ====
 
+# plot
+legtitle = 'Publication Bias Adjustment'
 ggplot(
-  fdr %>% 
-    select(tbar, starts_with('fdr')) %>% 
-    pivot_longer(-tbar, names_to = 'type', values_to = 'fdr')
+  plotme
   , aes(x=tbar, y=fdr, group = type)
 ) +
-  geom_line(aes(linetype=type, color = type)) +
-  coord_cartesian(ylim = c(0,100))
+  geom_line(aes(linetype=type, color = type), size=2.5) +
+  coord_cartesian(ylim = c(0,100)) +
+  scale_linetype_manual(values=c("dashed", "solid", "dotted")) +
+  scale_color_manual(values=c("#619CFF","#00BA38", "#F8766D")) +
+  theme_economist_white(gray_bg = FALSE) +
+  theme(
+    axis.title = element_text(size = 20)
+    , axis.text = element_text(size = 14)      
+    , legend.title = element_text(size = 14)
+    , legend.text = element_text(size = 14)
+    , legend.background = element_rect(colour = 'black', fill = 'white', linetype = 'solid')
+  )  +
+  labs(
+    x = TeX('\\bar{t}')
+    , y = TeX('FDR Upper Bound for $|t_i|>\\bar{t}$ (\\%)')
+    , linetype = legtitle, color = legtitle
+  )  +
+  theme(
+    legend.position = c(70,80)/100
+    , legend.key.width = unit(3,'cm')
+  ) +
+  scale_x_continuous(breaks = 1:6)
 
+pdfscale = 0.7
+ggsave('../results/emp-fdr.pdf', width = 10*pdfscale, height = 8*pdfscale)
 
 # TABLE ====
 

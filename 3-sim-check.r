@@ -155,29 +155,38 @@ average_many_sims = function(
 } # end average_many_sims
 
 
+# SIMULATE ILLUSTRATIONS ====
 
 
 
-# SELECTED SETTINGS FOR ILLUSTRATION ====
-
-## BASELINE SETTINGS
+## BASELINE SETTINGS ====
 
 # residuals
 emat = ematemp 
 Nemat = dim(emat)[2]
 Temat = dim(emat)[1]
 
-# model for simulation
+# modelS for simulation
 N = 1e4
 T_ = 200
+
+# fdr parameters
 pnull_small  = 0.5
 Emualt_small = 0.5
 
 pnull_large = 0.99
 Emualt_large = 0.25
 
+# bias parameters
+tgood_real = 2.6
+smarg_real = 0.5
+
+tgood_cray = 5.0
+smarg_cray = 0.25
+
 # number of sims, fdr estimates, other
-nsim = 10
+nsim = 100
+nsim_large = 100
 nulldf = 100
 tbarlist = seq(0,6,0.2)
 tgoodhat = 2.6
@@ -228,71 +237,69 @@ custom_plot = function(manysum){
   
 } # end custom_plot
 
-## EXAMPLES: CORRECT TGOOD ==== 
-tgood = 2.6
-smarg = 0.5
+## SIMULATE ====
 
 
-# EX 1: SMALL FDR 
+
+# realistic bias, small fdr
 # show off why fdrhat_exp is relevant
-manysum = average_many_sims(
-  N, T_, pnull = pnull_small, Emualt = Emualt_small,
-  tgood = tgood, smarg = smarg
+manysum_real_small = average_many_sims(
+  N, T_
+  , pnull = pnull_small, Emualt = Emualt_small,
+  tgood = tgood_real, smarg = smarg_real
   , nsim = 10
-  , tgoodhat, pnullhat, shapehat
-  )
-
-custom_plot(manysum)
-
-ggsave(filename = '../results/sim_ex_smallfdr.pdf', width = 10, height = 8)
-
-
-# EX 2: LARGE FDR 
-# show off how fdr_hat mix works even when most discoveries are false
-manysum = average_many_sims(
-  N, T_, pnull = pnull_large, Emualt = Emualt_large
-  , tgood = tgood, smarg = smarg
-  , nsim = 100
   , tgoodhat, pnullhat, shapehat
 )
 
-custom_plot(manysum) +
+# realistic bias, large fdr
+# show off how fdr_hat mix works even when most discoveries are false
+manysum_real_large = average_many_sims(
+  N, T_
+  , pnull = pnull_large, Emualt = Emualt_large
+  , tgood = tgood_real, smarg = smarg_real
+  , nsim = nsim_large
+  , tgoodhat, pnullhat, shapehat
+)
+
+
+# cray bias, small fdr
+# show off why fdrhat_exp is relevant
+manysum_cray_small = average_many_sims(
+  N, T_
+  , pnull = pnull_small, Emualt = Emualt_small,
+  tgood = tgood_cray, smarg = smarg_cray
+  , nsim = 10
+  , tgoodhat, pnullhat, shapehat
+)
+
+# cray bias, large fdr
+# show off how fdr_hat mix works even when most discoveries are false
+manysum_cray_large = average_many_sims(
+  N, T_
+  , pnull = pnull_large, Emualt = Emualt_large
+  , tgood = tgood_cray, smarg = smarg_cray
+  , nsim = nsim_large
+  , tgoodhat, pnullhat, shapehat
+)
+
+
+## PLOT ====
+
+# realistic bias
+custom_plot(manysum_real_small)
+ggsave(filename = '../results/sim_ex_smallfdr.pdf', width = 10, height = 8)
+
+custom_plot(manysum_real_large) +
   theme(
     legend.position = 'none'
   )
-
 ggsave(filename = '../results/sim_ex_largefdr.pdf', width = 10, height = 8)
 
-
-
-
-## EXAMPLES: MISSPECIFIED  ====
-tgood = 5.0
-smarg = 0.25
-
-# SMALL FDR
-manysum = average_many_sims(
-  N, T_, pnull = pnull_small, Emualt = Emualt_small,
-  tgood = tgood, smarg = smarg
-  , nsim = 10
-  , tgoodhat, pnullhat, shapehat
-)
-
-
-custom_plot(manysum)
-
+# cray bias
+custom_plot(manysum_cray_small)
 ggsave(filename = '../results/sim_ex_mis_smallfdr.pdf', width = 10, height = 8)
 
-# LARGE FDR 
-# show off how fdr_hat mix works even when most discoveries are false
-manysum = average_many_sims(
-  N, T_, pnull = pnull_large, Emualt = Emualt_large
-  , tgood = tgood, smarg = smarg
-  , nsim = 100
-  , tgoodhat, pnullhat, shapehat
-)
-
-custom_plot(manysum) +
+custom_plot(manysum_cray_large) +
   theme(
     legend.position = 'none'
   )
@@ -300,114 +307,136 @@ custom_plot(manysum) +
 ggsave(filename = '../results/sim_ex_mis_largefdr.pdf', width = 10, height = 8)
 
 
+# A CLOSER LOOK ====
+
+# requires sim from previous section
+
+##  FDRHATS ARE DIFFERENT ====
+temp = manysum_real_small %>% 
+  transmute(
+    tbar, fdrhat_exp, group = 'real'
+  ) %>% 
+  rbind(
+    manysum_cray_small %>% 
+      transmute(
+        tbar, fdrhat_exp, group = 'cray'
+      ) 
+  )
+
+# visual table check
+temp %>% 
+  pivot_wider(
+    names_prefix = 'fdrhat_', names_from = group, values_from = fdrhat_exp
+  )
+
+ggplot(temp, aes(x=tbar,y=fdrhat_exp)) +
+  geom_line(aes(color = group))
 
 
-## WHY MISSPECIFICATION DOES SO LITTLE ====
-# if pnull is large, the decay in t-stats past 2.6
-# is so sharp it dominates any kind of bias
+ggsave(filename = '../results/detail_fdrhat.pdf', width = 10, height = 8)
 
+## XX DETAILED SIM ====
 
-tgood_real = 2.6
-smarg_real = 0.5
-tgood_cray = 5.0
-smarg_cray = 0.25
+# notes:
+# offsetting effects: cray => C is smaller => fdrhat smaller
+# but cray => t-obs pushed to right => fdrhat is larger
 
+# choose spec
+nsim = 1e5
+pnull_det = pnull_small
+Emualt_det = Emualt_small
+
+# simulate all
 estat = estatsim(N, T_)
-tdat = estat_to_tdat(N, pnull=pnull_small,  Emualt=Emualt_small, estat)
+tdat = estat_to_tdat(N, pnull=pnull_det,  Emualt=Emualt_det, estat)
+t_all = tdat$t
 
+# realistic bias
 tdatpub = tdat_to_tdatpub(tdat, tgood = tgood_real, smarg = smarg_real )
 t_real = tdatpub$t
 fit_real = estimate_mixture(t_real, tgood = tgoodhat, pnull = pnullhat, shape = shapehat, 1)
+tfit_real = simmix(nsim,pnullhat,shape=shapehat,fit_real$scalehat,1)$t
 
+fdr_real = estimate_fdr(t_real, tbarlist, fit_real$C, nulldf=nulldf)
+
+# crazy bias
 tdatpub = tdat_to_tdatpub(tdat, tgood = tgood_cray, smarg = smarg_cray )
 t_cray = tdatpub$t
 fit_cray = estimate_mixture(t_cray, tgood = tgoodhat, pnull = pnullhat, shape = shapehat, 1)
+fdr_cray = estimate_fdr(t_cray, tbarlist, fit_real$C, nulldf=nulldf)
+tfit_cray = simmix(nsim,pnullhat,shape=shapehat,fit_cray$scalehat,1)$t
 
-histcomp(t_real,t_cray,edge=seq(2,8,0.2))
+# plot ====
 
-mean(t_real[t_real>2.6])
-mean(t_cray[t_cray>2.6])
+# settings
+edge = seq(0,8,0.2)
+density_max = 1.5
 
-
-# simulate bias fit
-nsim = 1e5
-fitmix = fit_real
-t_mix = simmix(nsim,fitmix$pnull,shape=fitmix$shape,fitmix$scalehat,fitmix$sigma)$t
-
-t_all = data.frame(
-  t = t_real, group = 'data_biased'
+temp = data.frame(
+  t = t_real, group = 'obs'
 ) %>% 
   rbind(
     data.frame(
-      t = t_mix, group = 'fit_mix'
+      t = tfit_real, group = 'fit'
     )
-  )
-
-edge = seq(0,8,0.2)
-t_sum = t_all %>% 
+  ) %>%
+  rbind(
+    data.frame(
+      t = t_all, group = 'all'
+    ) 
+  ) %>% 
   filter(t>edge[1],t<edge[length(edge)]) %>% 
   group_by(group) %>% 
   summarize(
-    density = hist(t,edge)$density
-    , mid = hist(t,edge)$mids
-  )
+    density = hist(t,edge)$density / sum(t>tgoodhat)*n()
+    , t = hist(t,edge)$mids
+  ) 
 
-
-# ====
-
-
-
-
-# output to console
-fitexp %>% t()
-fitmix %>% t()
-
-
-## create data frame with all groups
-datall = data.frame(t = tdatpub$t, group = 'emp') %>% 
+p_real = ggplot(
+  temp %>% filter(group %in% c('obs','all'))
+  , aes(x=t, y=density, fill  = group)
+) +
+  geom_bar(stat = 'identity', alpha = 0.6, position = 'dodge') +
+  geom_line(
+    data=temp %>% filter(group=='fit') 
+  ) +
+  coord_cartesian(ylim =c(0,density_max))
+  
+temp = data.frame(
+  t = t_cray, group = 'obs'
+) %>% 
   rbind(
-    data.frame(t = t_exp, group = 'exp')
+    data.frame(
+      t = tfit_cray, group = 'fit'
+    )
   ) %>% 
   rbind(
-    data.frame(t = t_mix, group = 'mix')
-  )
-
-edge = seq(0,6,0.2)
-hall = datall %>% 
-  filter(t>min(edge), t<max(edge)) %>% 
+    data.frame(
+      t = t_all, group = 'all'
+    ) 
+  ) %>%   
+  filter(t>edge[1],t<edge[length(edge)]) %>% 
   group_by(group) %>% 
   summarize(
-    tmid = hist(t,edge)$mid
-    , density = hist(t,edge)$density
-  ) %>% 
-  left_join(
-    datall %>% group_by(group) %>% summarise(Pr_good = sum(t>tgoodhat)/n())
-  ) %>% 
-  mutate(
-    density_good = density/Pr_good
-  )
+    density = hist(t,edge)$density / sum(t>tgoodhat)*n()
+    , t = hist(t,edge)$mids
+  ) 
+
+p_cray = ggplot(
+  temp %>% filter(group %in% c('obs','all'))
+  , aes(x=t, y=density, fill  = group)
+) +
+  geom_bar(stat = 'identity', alpha = 0.6, position = 'dodge') +
+  geom_line(
+    data=temp %>% filter(group=='fit') 
+  ) +
+  coord_cartesian(ylim =c(0,density_max))
 
 
-## plot all
-ggplot(hall, aes(x=tmid, y=density_good, fill=group)) +
-  geom_bar(stat='identity', position='dodge',alpha=0.6, show.legend = T)  +
-  coord_cartesian(ylim=c(0,20))
+grid.arrange(p_real, p_cray)
 
 
-mean(tdatpub$t[tdatpub$t > tgoodhat])
+# save to disk
+ggsave(p_real, filename = '../results/simdet_fitreal.pdf', width = 10, height = 4)
 
-# ====
-
-# ggsave(filename = '../results/Pr_good_fit_all.pdf', width = 10, height = 8)
-
-## plot t > 2 only
-p2 = ggplot(
-  hall 
-  , aes(x=tmid, y=density_good, fill=group)) +
-  geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = T)  +
-  coord_cartesian(ylim=c(0,1.5))
-
-# ggsave(filename = '../results/Pr_good_fit_zoom.pdf', width = 10, height = 8)
-
-
-grid.arrange(p1,p2)
+ggsave(p_cray, filename = '../results/simdet_fitcray.pdf', width = 10, height = 4)
