@@ -145,7 +145,7 @@ average_many_sims = function(
   # average across simulations
   manysum = simmany %>% 
     group_by(tbar) %>% 
-    summarize_at(
+    summarise_at(
       vars(2:(dim(simmany)[2])-2), mean, na.rm=F
     ) %>% 
     mutate(
@@ -387,7 +387,7 @@ temp = data.frame(
   ) %>% 
   filter(t>edge[1],t<edge[length(edge)]) %>% 
   group_by(group) %>% 
-  summarize(
+  summarise(
     density = hist(t,edge)$density / sum(t>tgoodhat)*n()
     , t = hist(t,edge)$mids
   ) 
@@ -417,7 +417,7 @@ temp = data.frame(
   ) %>%   
   filter(t>edge[1],t<edge[length(edge)]) %>% 
   group_by(group) %>% 
-  summarize(
+  summarise(
     density = hist(t,edge)$density / sum(t>tgoodhat)*n()
     , t = hist(t,edge)$mids
   ) 
