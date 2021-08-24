@@ -9,7 +9,7 @@ library(ggplot2)
 library(ggthemes)
 library(gridExtra)
 library(latex2exp)
-source('0-functions.r')
+debugSource('0-functions.r')
 
 # load data
 load('../data/emp_data.Rdata')
@@ -31,131 +31,7 @@ Nemp = dim(ematemp)[2]
 Temp = dim(ematemp)[1]
 
 
-## FUNCTIONS USED THROUGHOUT SECTIONS
-# tdat is a dataframe with columns (t, other stuff)
-tdat_to_tdatpub = function(tdat, tbad=1.96, tgood=2.6, smarg=0.5, sbar=1){
-  tdat$u = runif(dim(tdat)[1]) 
-  tdat = tdat %>% 
-    mutate(
-      pub = F
-      , pub = case_when(
-        t > tbad & t <= tgood & u < smarg ~ T
-        , t > tgood & u < sbar ~ T
-      )
-    ) %>% 
-    filter(pub) %>% 
-    select(-pub)
-} # end function 
-
-
-estatsim = function(N, T_){
-  # emat is a global
-  
-  Nperblock = dim(emat)[2]
-  nblock = floor(N/Nperblock)+1
-  
-  # first draw a ton of residuals
-  imonth  = sample(1:Temat, nblock*T_ , replace = T) # draw list of months
-  esim = emat[imonth, ] %>% as.matrix
-  
-  # average within blocks 
-  tic = Sys.time()
-  ebar = numeric(nblock*Nemat)
-  evol = ebar
-  for (blocki in 1:nblock){
-    tstart = (blocki-1)*T_ + 1
-    tend = tstart + T_ - 1
-    
-    Nstart = (blocki-1)*Nemat + 1
-    Nend = Nstart + Nemat - 1
-    ebar[Nstart:Nend] = colMeans(esim[tstart:tend, ])
-    evol[Nstart:Nend] = sqrt(colMeans(esim[tstart:tend, ]^2))
-  }
-  
-  # clean and output
-  estat = data.frame(
-    bar = ebar[1:N]
-    , vol = evol[1:N]
-  )
-} # end ebarsim
-
-
-# function for generating observables and nulls
-estat_to_tdat = function(N,pnull,Emualt,estat){
-  
-  # adjust for true
-  nnull = sum(runif(N) < pnull)
-  null = logical(N)
-  null[1:nnull] = T
-  mu = matrix(0, N)
-  mu[!null] = Emualt
-  
-  # observables
-  t = (mu + estat$bar)/estat$vol*sqrt(T_)
-  
-  # pack and output
-  data.frame(t = abs(t), null = null, mu = mu, traw = t)
-  
-} # end e_to_t
-
-
-average_many_sims = function(
-  N, T_, pnull, Emualt, tgood, smarg
-  , nsim 
-  , tgoodhat, pnullhat, shapehat
-){
-  simmany = data.frame()
-  for (simi in 1:nsim){
-    print(paste0('simulation number ', simi))
-    
-    estat = estatsim(N, T_)
-    tdat = estat_to_tdat(N, pnull, Emualt, estat)
-    tdatpub = tdat_to_tdatpub(tdat, tgood = tgood, smarg = smarg )
-    
-    # actual fdr
-    fdr_actual = estimate_fdr(
-      tdat$t, tbarlist = tbarlist, null = tdat$null
-    ) %>% 
-      transmute(tbar, dr_actual = dr, fdr_actual)
-    
-    # fdrhat using exp
-    est_bias = estimate_exponential(tdatpub$t, tgoodhat)
-    fdr_exp = estimate_fdr(
-      tdatpub$t, tbarlist = tbarlist, C = est_bias$C, nulldf = nulldf
-    ) %>% 
-      transmute(tbar, fdrhat_exp = fdrhat)
-    
-    # fdrhat using mix
-    est_bias = estimate_mixture(tdatpub$t, tgood = tgoodhat, pnull = pnullhat, shape = shapehat, 1)
-    fdr_mix = estimate_fdr(
-      tdatpub$t, tbarlist = tbarlist, C = est_bias$C, nulldf = nulldf
-    ) %>% 
-      transmute(tbar, fdrhat_mix = fdrhat)
-    
-    est_all = fdr_actual %>% 
-      left_join(fdr_exp, by = 'tbar') %>% 
-      left_join(fdr_mix, by = 'tbar')
-    
-    est_all$simi = simi
-    
-    simmany = rbind(simmany, est_all)  
-    
-  } # end for simi
-  
-  # average across simulations
-  manysum = simmany %>% 
-    group_by(tbar) %>% 
-    summarise_at(
-      vars(2:(dim(simmany)[2])-2), mean, na.rm=F
-    ) %>% 
-    mutate(
-      Ndisc = dr_actual*N
-    )
-  
-} # end average_many_sims
-
-
-# SIMULATE ILLUSTRATIONS ====
+# SIMULATION VERIFICATION ====
 
 
 
@@ -184,14 +60,16 @@ smarg_real = 0.5
 tgood_cray = 5.0
 smarg_cray = 0.25
 
-# number of sims, fdr estimates, other
+# number of sims, 
 nsim = 100
 nsim_large = 100
 nulldf = 100
-tbarlist = seq(0,6,0.2)
+tbarlist = seq(0,8,0.2)
+
+# tuning parameters
 tgoodhat = 2.6
-pnullhat = 0.9
-shapehat = 2
+pnullhat = 0
+shapehat = 0.5
 
 # plot settings
 custom_plot = function(manysum){
@@ -237,9 +115,42 @@ custom_plot = function(manysum){
   
 } # end custom_plot
 
+
+## DEBUG SECTION (NOT RUN)  ====
+# the exp esstimation fails for selectwed pnull in (0.9, 0.95)
+# with Emualt_large = 0.50... but then works if pnull is higher
+
+
+if (F){
+  
+  nulldf = 100
+  nsim_large = 20
+  
+  pnullhat = 0.0
+  shapehat = 1/8
+  
+  pnull_large = 0.9
+  Emualt_large = 0.12
+  
+  # realistic bias, large fdr
+  debugSource('0-functions.r')
+  manysum_real_large = average_many_sims(
+    N, T_
+    , pnull = pnull_large, Emualt = Emualt_large
+    , tgood = tgood_real, smarg = smarg_real
+    , nsim = nsim_large
+    , tgoodhat, pnullhat, shapehat
+  )
+  
+  
+  custom_plot(manysum_real_large)+
+    theme(
+      legend.position = 'none'
+    )
+  
+} # if (F)
+
 ## SIMULATE ====
-
-
 
 # realistic bias, small fdr
 # show off why fdrhat_exp is relevant
@@ -252,7 +163,6 @@ manysum_real_small = average_many_sims(
 )
 
 # realistic bias, large fdr
-# show off how fdr_hat mix works even when most discoveries are false
 manysum_real_large = average_many_sims(
   N, T_
   , pnull = pnull_large, Emualt = Emualt_large
@@ -308,34 +218,7 @@ ggsave(filename = '../results/sim_ex_mis_largefdr.pdf', width = 10, height = 8)
 
 
 # A CLOSER LOOK ====
-
-# requires sim from previous section
-
-##  FDRHATS ARE DIFFERENT ====
-temp = manysum_real_small %>% 
-  transmute(
-    tbar, fdrhat_exp, group = 'real'
-  ) %>% 
-  rbind(
-    manysum_cray_small %>% 
-      transmute(
-        tbar, fdrhat_exp, group = 'cray'
-      ) 
-  )
-
-# visual table check
-temp %>% 
-  pivot_wider(
-    names_prefix = 'fdrhat_', names_from = group, values_from = fdrhat_exp
-  )
-
-ggplot(temp, aes(x=tbar,y=fdrhat_exp)) +
-  geom_line(aes(color = group))
-
-
-ggsave(filename = '../results/detail_fdrhat.pdf', width = 10, height = 8)
-
-## XX DETAILED SIM ====
+## DETAILED SIM ====
 
 # notes:
 # offsetting effects: cray => C is smaller => fdrhat smaller
@@ -392,16 +275,52 @@ temp = data.frame(
     , t = hist(t,edge)$mids
   ) 
 
+
 p_real = ggplot(
   temp %>% filter(group %in% c('obs','all'))
-  , aes(x=t, y=density, fill  = group)
+  , aes(x=t, y=density, fill = group)
 ) +
   geom_bar(stat = 'identity', alpha = 0.6, position = 'dodge') +
   geom_line(
-    data=temp %>% filter(group=='fit') 
+    data=temp %>% filter(group=='fit'),
+    size = 1.5,
+    color = "#00BA38"
   ) +
-  coord_cartesian(ylim =c(0,density_max))
-  
+  scale_fill_manual(
+    name = NULL,
+    values = c(
+      "all" = "#F8766D",
+      "fit" = "#00BA38",
+      "obs" = "#619CFF"
+    ),
+    labels = c(
+      "All",
+      "Fit",
+      "Obs"
+    )
+  ) +
+  coord_cartesian(ylim =c(0,density_max)) +
+  theme_economist_white(gray_bg = FALSE) +
+  theme(
+    axis.title = element_text(size = 20)
+    , axis.text = element_text(size = 14)      
+    , legend.title = element_text(size = 14)
+    , legend.text = element_text(size = 14)
+    , legend.background = element_rect(colour = 'black', fill = 'white', linetype = 'solid')
+  ) +
+  labs(
+    x = TeX('\\bar{t}')
+    , y = TeX('Density')
+  ) +
+  theme(
+    legend.position = c(70,80)/100
+    , legend.key.width = unit(1,'cm')
+  ) +
+  scale_x_continuous(breaks = 0:8) + 
+  coord_cartesian(ylim=c(0,10))  
+
+
+# plot cray
 temp = data.frame(
   t = t_cray, group = 'obs'
 ) %>% 
@@ -422,15 +341,49 @@ temp = data.frame(
     , t = hist(t,edge)$mids
   ) 
 
-p_cray = ggplot(
+p_cray = 
+  ggplot(
   temp %>% filter(group %in% c('obs','all'))
-  , aes(x=t, y=density, fill  = group)
+  , aes(x=t, y=density, fill = group)
 ) +
   geom_bar(stat = 'identity', alpha = 0.6, position = 'dodge') +
   geom_line(
-    data=temp %>% filter(group=='fit') 
+    data=temp %>% filter(group=='fit'),
+    size = 1.5,
+    color = "#00BA38"
   ) +
-  coord_cartesian(ylim =c(0,density_max))
+  scale_fill_manual(
+    name = NULL,
+    values = c(
+      "all" = "#F8766D",
+      "obs" = "#619CFF",
+      "fit" = "#00BA38"
+    ),
+    labels = c(
+      "All",
+      "Fit",
+      "Obs"
+    )
+  ) +
+  coord_cartesian(ylim =c(0,density_max)) +
+  theme_economist_white(gray_bg = FALSE) +
+  theme(
+    axis.title = element_text(size = 20)
+    , axis.text = element_text(size = 14)      
+    , legend.title = element_text(size = 14)
+    , legend.text = element_text(size = 14)
+    , legend.background = element_rect(colour = 'black', fill = 'white', linetype = 'solid')
+  ) +
+  labs(
+    x = TeX('\\bar{t}')
+    , y = TeX('Density')
+  ) +
+  theme(
+    legend.position = c(70,80)/100
+    , legend.key.width = unit(1,'cm')
+  ) +
+  scale_x_continuous(breaks = 0:8) +
+    coord_cartesian(ylim=c(0,10))
 
 
 grid.arrange(p_real, p_cray)

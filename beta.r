@@ -517,3 +517,84 @@ fdr = data.frame(
 
 
 
+# check by hand robustness of extrapolations! ====
+# 08 23
+
+source('0-functions.r')
+
+# load data
+load('../data/emp_data.Rdata')
+
+# balanced data
+retwide = pivot_wider(
+  emp_ret
+  , c(signalname,date,ret), names_from = signalname, values_from = ret
+) %>% 
+  select(-date) %>% 
+  filter(complete.cases(.))
+retmat = as.matrix(retwide) 
+
+# generate residuals
+rbar = colMeans(retmat) %>% as.matrix() %>% t()
+l = 1+integer(nrow(retmat)) %>% as.matrix 
+ematemp = retmat - l %*% rbar
+Nemp = dim(ematemp)[2]
+Temp = dim(ematemp)[1] 
+
+emat = ematemp
+Temat = Temp
+Nemat = Nemp
+
+
+N = 1e4
+T_ = 200
+pnull = 0.9
+Emualt = 0.5
+tgood = 2.6
+smarg = 0.5
+
+# simulate  
+estat = estatsim(N, T_)
+tdat = estat_to_tdat(N, pnull, Emualt, estat)
+tdatpub = tdat_to_tdatpub(tdat, tgood = tgood, smarg = smarg )
+
+tbarlist = seq(0,6,0.5)
+fdr_actual = estimate_fdr(
+  tdat$t, tbarlist = tbarlist, null = tdat$null
+) %>% 
+  transmute(tbar, dr_actual = dr, fdr_actual)
+
+# hand estimate
+shapehat = mean(tdatpub$t[tdatpub$t>2.6]) - tgood
+tsim = rexp(1e5, 1/shapehat)
+
+fdr_actual %>% 
+  mutate(
+    # dr_hat = round(exp(-tbar/shapehat) , 4)
+    dr_hat = round( 1-pexp(tbar, 1/shapehat) , 4)
+    , fdr_hat = round( 2*pt(-tbar,100)/dr_hat, 4)
+    , actual_hat = fdr_actual/fdr_hat
+  ) 
+
+
+sum(tsim > 1.0) / length(tsim)
+
+hist(tdatpub$t)
+
+
+
+
+
+# ====
+
+simmany %>% 
+  group_by(
+    tbar
+  ) %>% 
+  summarise(
+    actual = mean(fdr_actual, na.rm=T)
+    , hat_mean = mean(fdrhat_exp, na.rm=T)
+    , hat_median = quantile(fdrhat_exp, 0.5, na.rm=T)
+    , hat_low = quantile(fdrhat_exp, 0.1, na.rm=T)
+    , median = median(fdr_actual/fdrhat_mix)
+  )
