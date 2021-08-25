@@ -1,7 +1,7 @@
 # 2021 08 andrew testing bh style analysis in r
 
 
-# ==== ENVIRONMENT ====
+# ENVIRONMENT ====
 
 rm(list = ls())
 library(tidyverse)
@@ -27,7 +27,7 @@ pathRelease %>% drive_ls()
 
 
 
-# ==== DOWNLOAD DATA =====
+# DOWNLOAD DATA =====
 
 # summary
 target_dribble = pathRelease %>% drive_ls() %>% 
@@ -41,7 +41,7 @@ drive_download(target_dribble, path = '../data/deleteme.xlsx', overwrite = T)
 cz = read_excel('../data/deleteme.xlsx',sheet='short')
 
 
-# ==== GAMMA ESTIMATION ====
+# GAMMA ESTIMATION ====
 scale = 2
 n = 5000
 tgood = 2.6
@@ -121,7 +121,7 @@ print(scalehat)
 print(objhat)
 
 
-# ==== MIXTURE ESTIMATION ====
+# MIXTURE ESTIMATION ====
 shape = 3
 n = 1e6
 tgood = 2.6
@@ -214,7 +214,7 @@ print(objhat)
 
 
 
-# ==== SYMMETRIC MIXTURE ESTIMATION ====
+# SYMMETRIC MIXTURE ESTIMATION ====
 pnull = 0.5
 shape = 2
 scale = 1/shape
@@ -340,7 +340,7 @@ print(pnullhat)
 print(scalehat)
 print(scalehat*shape)
 
-# ==== FDR BOUNDS ====
+# FDR BOUNDS ====
 
 tbarlist = c(2.0, 2.6, 3.0)
 C = 17

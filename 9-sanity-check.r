@@ -88,16 +88,17 @@ manysum_real_large = average_many_sims(
   ematemp
   , N = 1e4
   , T_ = 200
-  , pnull = 0.5
-  , Emualt = 0.5
+  , exmethod = 'eznoise'
+  , pnull = 0.99
+  , Emualt = 0.10
   , tgood = 2.6
   , smarg = 0.5
-  , nsim = 10
+  , nsim = 20
   , tgoodhat = 2.6
   , pnullhat = 0
-  , shapehat = 1/8
-  , nulldf = 100
-  , tbarlist = seq(0,6,0.5)
+  , shapehat = 1/2
+  , nulldf = 200
+  , tbarlist = seq(0,12,0.2)
 )
 
 
@@ -116,14 +117,14 @@ custom_plot(manysum_real_large)
 N = 1e5
 T_ = 200
 emat = ematemp
-pnull = 0.5
+pnull = 0.99
 Emualt = 0.12
 tgood = 2.6
 smarg = 0.5
 
 tbarlist = seq(0,6,0.5)
 
-estat = estatsim(emat, N, T_)
+estat = estatsim(emat, N, T_, exmethod = 'eznoise')
 tdat = estat_to_tdat(N, T_, pnull, Emualt, estat)
 tdatpub = tdat_to_tdatpub(tdat, tgood = tgood, smarg = smarg )
 
@@ -139,7 +140,7 @@ fdr_actual
 scalehat = mean(tdatpub$t[tdatpub$t>2.6]) - 2.6
  
 # estiamte gamma 
-gshapehat = 1/8
+gshapehat = 1/2
 minme = function(scale){
   (mean(tdatpub$t[tdatpub$t>2.6])
    - extrunc('gamma', a=2.6, b = Inf, shape = gshapehat, rate = 1/scale))^2
@@ -214,3 +215,53 @@ p_fit = ggplot(
 fdr
 
 grid.arrange(p_fdr,p_fit)
+
+
+hist(tdat$traw)
+
+
+trawnull = tdat$traw[tdat$null]
+
+sd(trawnull)
+kurtosis(trawnull)
+
+
+# check correlations ====
+
+N = 1e3
+
+rho = 0.9
+i = sample(1:dim(emat)[2], N, replace = T)
+t = sample(1:dim(emat)[1], T_, replace = T)
+noise = matrix(rnorm(N*T_,0,5), T_, N)
+emat2 = rho*emat[t,i]+(1-rho)*noise
+
+
+csim = cor(emat2)
+cemp = cor(emat)
+
+
+csim2 = csim[lower.tri(csim)]
+cemp2 = cemp[lower.tri(cemp)]
+
+
+
+cdat = data.frame(
+  c = csim2, group = 'sim'
+) %>% rbind(
+  data.frame(
+    c = cemp2 , group = 'emp'
+  ) 
+)
+
+
+ggplot(cdat, aes(x=c, fill = group)) +
+  geom_histogram(aes(y = ..density..), position = 'dodge', alpha = 0.5)
+
+
+
+se_r = sqrt(1/(T_))
+
+se_r
+sd(cemp2)
+sd(csim2)

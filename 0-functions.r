@@ -210,45 +210,58 @@ tdat_to_tdatpub = function(tdat, tbad=1.96, tgood=2.6, smarg=0.5, sbar=1){
     select(-pub)
 } # end function 
 
-estatsim = function(emat, N, T_){
+estatsim = function(emat, N, T_, exmethod, expar, outputmat = F){
   
   Nperblock = dim(emat)[2]
   nblock = floor(N/Nperblock)+1
   Nemat = dim(emat)[2]
   
-  # # first draw a ton of residuals
-  # imonth  = sample(1:dim(emat)[1], nblock*T_ , replace = T) # draw list of months
-  # esim = emat[imonth, ] %>% as.matrix
-  # 
-  # # average within blocks 
-  # tic = Sys.time()
-  # ebar = numeric(nblock*Nemat)
-  # evol = ebar
-  # for (blocki in 1:nblock){
-  #   tstart = (blocki-1)*T_ + 1
-  #   tend = tstart + T_ - 1
-  #   
-  #   Nstart = (blocki-1)*Nemat + 1
-  #   Nend = Nstart + Nemat - 1
-  #   ebar[Nstart:Nend] = colMeans(esim[tstart:tend, ])
-  #   evol[Nstart:Nend] = sqrt(colMeans(esim[tstart:tend, ]^2))
-  # }
-  
-  # test
-  rho = 0.9
-  i = sample(1:dim(emat)[2], N, replace = T)
-  t = sample(1:dim(emat)[1], T_, replace = T)
-  noise = matrix(rnorm(N*T_,0,5), T_, N)
-  emat2 = rho*emat[t,i]+(1-rho)*noise
-  ebar = colMeans(emat2)
-  evol = sqrt(colMeans(emat2^2))
-  
+  if (exmethod == 'block'){
+    # blocks of emat
+    
+    # first draw a ton of residuals
+    imonth  = sample(1:dim(emat)[1], nblock*T_ , replace = T) # draw list of months
+    esim = emat[imonth, ] %>% as.matrix
+    
+    ebar = numeric(nblock*Nemat)
+    evol = ebar    
+    for (blocki in 1:nblock){
+
+      
+      tstart = (blocki-1)*T_ + 1
+      tend = tstart + T_ - 1
+      
+      Nstart = (blocki-1)*Nemat + 1
+      Nend = Nstart + Nemat - 1
+      ebar[Nstart:Nend] = colMeans(esim[tstart:tend, ])
+      evol[Nstart:Nend] = sqrt(colMeans(esim[tstart:tend, ]^2))
+    }
+    
+  } else if (exmethod == 'eznoise'){
+    # giant emat redraw, remove redudandancy with noise
+    
+    rho = expar
+    i = sample(1:dim(emat)[2], N, replace = T)
+    t = sample(1:dim(emat)[1], T_, replace = T)
+    noise = matrix(rnorm(N*T_,0,5), T_, N)
+    emat2 = rho*emat[t,i]+(1-rho)*noise
+    ebar = colMeans(emat2)
+    evol = sqrt(colMeans(emat2^2))
+    
+  } # end if exmethod
   
   # clean and output
   estat = data.frame(
     bar = ebar[1:N]
     , vol = evol[1:N]
   )
+  
+  if (outputmat){
+    return(emat2)
+  } else{
+    return(estat)
+  }
+  
 } # end ebarsim
 
 # function for generating observables and nulls
@@ -272,7 +285,8 @@ estat_to_tdat = function(N,T_,pnull,Emualt,estat){
 
 
 average_many_sims = function(
-  emat, N, T_, pnull, Emualt, tgood, smarg
+  emat, N, T_, exmethod, expar 
+  , pnull, Emualt, tgood, smarg
   , nsim 
   , tgoodhat, pnullhat, shapehat, nulldf
   , tbarlist
@@ -281,7 +295,7 @@ average_many_sims = function(
   for (simi in 1:nsim){
     print(paste0('simulation number ', simi))
     
-    estat = estatsim(emat, N, T_)
+    estat = estatsim(emat, N, T_, exmethod, expar)
     tdat = estat_to_tdat(N, T_, pnull, Emualt, estat)
     tdatpub = tdat_to_tdatpub(tdat, tgood = tgood, smarg = smarg )
     

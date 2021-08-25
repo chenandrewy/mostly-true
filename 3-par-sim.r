@@ -37,21 +37,18 @@ Temp = dim(ematemp)[1]
 
 ## SETTINGS ====
 
-# residuals
-emat = ematemp 
-Nemat = dim(emat)[2]
-Temat = dim(emat)[1]
-
-# modelS for simulation
+# dimentions, errors
 N = 1e4
 T_ = 200
+exmethod = 'eznoise'
+exrho = 0.9
 
 # fdr parameters
 pnull_small  = 0.5
 Emualt_small = 0.5
 
 pnull_large = 0.99
-Emualt_large = 0.12
+Emualt_large = 0.25
 
 # bias parameters
 tgood_real = 2.6
@@ -61,58 +58,172 @@ tgood_cray = 5.0
 smarg_cray = 0.25
 
 # number of sims, 
-nsim = 200
-nsim_large = 200
-nulldf = 100
-tbarlist = seq(0,12,0.2)
+nsim = 100
+nsim_large = 100
+tbarlist = seq(0,12,0.1)
 
 # tuning parameters
 tgoodhat = 2.6
 pnullhat = 0
-shapehat = 0.5
+shapehat = 1/2
+nulldfhat = 100
 
+## SIMULATE AND COMPARE CORRELATION MATRIX ====
 
+if (F){
+  esim = estatsim(
+    emat = ematemp
+    , N = N
+    , T_ = T_
+    , exmethod = exmethod
+    , expar = exrho
+    , outputmat = T
+  )
+  
+  csim = cor(esim)
+  cemp = cor(ematemp)
+  
+  csim2 = csim[lower.tri(csim)]
+  cemp2 = cemp[lower.tri(cemp)]
+  
+  cdat = data.frame(
+    c = csim2, group = 'sim', color = niceblue
+  ) %>% rbind(
+    data.frame(
+      c = cemp2 , group = 'emp', color = 'gray'
+    ) 
+  )
+  
+  edge = seq(-1,1,0.1)
+  plotme = cdat %>% 
+    group_by(group) %>% 
+    summarise(
+      cmid = hist(c,edge)$mids
+      , density = hist(c,edge)$density
+    ) %>% 
+    mutate(
+      group = factor(
+        group
+        , levels = c('sim','emp')
+        , labels = c('Simulated','CZ Data')
+      )
+    )
+  
+  
+  ggplot(
+    plotme, aes(x=cmid, y=density, group = group)
+  ) +
+    geom_line(
+      aes(linetype = group, color = group), size = 2
+    ) +
+    theme_economist_white(gray_bg = F) +
+    theme(
+      axis.title = element_text(size = 12)
+      , axis.text = element_text(size = 10)      
+      , legend.title = element_blank()
+      , legend.text = element_text(size = 10)
+      , legend.key.size = unit(0.1, 'cm')
+      , legend.position = c(80,80)/100
+      , legend.key.width = unit(1,'cm')    
+      , legend.spacing.y = unit(0.000001, 'cm')
+      , legend.background = element_rect(colour = 'black', fill = 'white')    
+    ) +
+    labs(
+      x = 'Pairwise Correlation'
+      , y = 'Density'
+    ) +
+    scale_color_manual(
+      values=c(niceblue, 'gray')
+    ) +
+    scale_linetype_manual(values = c('solid','31'))
+  
+  
+  ggsave(
+    filename = '../results/simcor.pdf', width = 5, height = 4
+  )
+  
+  rm(csim,csim2)
+  
+}
 
-## SIMULATE ====
+## SIMULATE ESTIMATIONS ====
 
 # realistic bias, small fdr
-# show off why fdrhat_exp is relevant
 manysum_real_small = average_many_sims(
-  ematemp, N, T_
-  , pnull = pnull_small, Emualt = Emualt_small,
-  tgood = tgood_real, smarg = smarg_real
+  ematemp
+  , N = N
+  , T_ = T_
+  , exmethod = exmethod
+  , expar = exrho
+  , pnull = pnull_small
+  , Emualt = Emualt_small
+  , tgood = tgood_real
+  , smarg = smarg_real
   , nsim = nsim
-  , tgoodhat, pnullhat, shapehat, nulldf, tbarlist
+  , tgoodhat = tgoodhat
+  , pnullhat = pnullhat
+  , shapehat= shapehat
+  , nulldf = nulldfhat
+  , tbarlist = tbarlist
 )
+
 
 # realistic bias, large fdr
 manysum_real_large = average_many_sims(
-  ematemp, N, T_
-  , pnull = pnull_large, Emualt = Emualt_large
-  , tgood = tgood_real, smarg = smarg_real
-  , nsim = nsim_large
-  , tgoodhat, pnullhat, shapehat, nulldf, tbarlist
+  ematemp
+  , N = N
+  , T_ = T_
+  , exmethod = exmethod
+  , expar = exrho
+  , pnull = pnull_large
+  , Emualt = Emualt_large
+  , tgood = tgood_real
+  , smarg = smarg_real
+  , nsim = nsim
+  , tgoodhat = tgoodhat
+  , pnullhat = pnullhat
+  , shapehat= shapehat
+  , nulldf = nulldfhat
+  , tbarlist = tbarlist
 )
 
-
 # cray bias, small fdr
-# show off why fdrhat_exp is relevant
 manysum_cray_small = average_many_sims(
-  ematemp, N, T_
-  , pnull = pnull_small, Emualt = Emualt_small,
-  tgood = tgood_cray, smarg = smarg_cray
+  ematemp
+  , N = N
+  , T_ = T_
+  , exmethod = exmethod
+  , expar = exrho
+  , pnull = pnull_small
+  , Emualt = Emualt_small
+  , tgood = tgood_cray
+  , smarg = smarg_cray
   , nsim = nsim
-  , tgoodhat, pnullhat, shapehat, nulldf, tbarlist
+  , tgoodhat = tgoodhat
+  , pnullhat = pnullhat
+  , shapehat= shapehat
+  , nulldf = nulldfhat
+  , tbarlist = tbarlist
 )
 
 # cray bias, large fdr
 # show off how fdr_hat mix works even when most discoveries are false
 manysum_cray_large = average_many_sims(
-  ematemp, N, T_
-  , pnull = pnull_large, Emualt = Emualt_large
-  , tgood = tgood_cray, smarg = smarg_cray
-  , nsim = nsim_large
-  , tgoodhat, pnullhat, shapehat, nulldf, tbarlist
+  ematemp
+  , N = N
+  , T_ = T_
+  , exmethod = exmethod
+  , expar = exrho
+  , pnull = pnull_large
+  , Emualt = Emualt_large
+  , tgood = tgood_cray
+  , smarg = smarg_cray
+  , nsim = nsim
+  , tgoodhat = tgoodhat
+  , pnullhat = pnullhat
+  , shapehat= shapehat
+  , nulldf = nulldfhat
+  , tbarlist = tbarlist
 )
 
 
@@ -178,7 +289,7 @@ p2 = custom_plot(manysum_real_large) +
     legend.position = 'none'
   ) +
   coord_cartesian(
-    xlim = c(0,10)
+    xlim = c(0,6)
   )
 ggsave(filename = '../results/sim_ex_largefdr.pdf', width = pdf_w, height = pdf_h)
 
@@ -194,7 +305,7 @@ p4 = custom_plot(manysum_cray_large) +
     legend.position = 'none'
   )  +
   coord_cartesian(
-    xlim = c(0,10)
+    xlim = c(0,6)
   )
 ggsave(filename = '../results/sim_ex_mis_largefdr.pdf', width = pdf_w, height = pdf_h)
 
@@ -203,6 +314,7 @@ grid.arrange(p1,p2,p3,p4)
 
 
 ## CHECKS ====
+stop()
 
 emat = ematemp
 

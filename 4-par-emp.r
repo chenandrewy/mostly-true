@@ -23,7 +23,7 @@ t_emp = emp_sum$t
 tgood = 2.6
 
 pnullhat = 0.0
-shapehat = 0.125
+shapehat = 1/2
 nulldf = 100
 sigmahat = 1
 
@@ -38,7 +38,7 @@ bias_exp %>% t()
 bias_mix %>% t()
 
 # simulate to plot dist
-# eventually: just plot the distribution function
+# eventually: just plot the pdf
 nsim = 1e6
 datmix = simmix(nsim,pnullhat,shapehat,bias_mix$scalehat,sigmahat)
 datexp = simmix(nsim,pnull=0,shape=1,bias_exp$scalehat,sigmahat)
@@ -307,3 +307,5 @@ temp = latex(
 )
 
 
+
+texme %>% print
