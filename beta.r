@@ -585,16 +585,75 @@ hist(tdatpub$t)
 
 
 
-# ====
+# bootstrapping with correlated blocks ====
 
-simmany %>% 
-  group_by(
-    tbar
-  ) %>% 
-  summarise(
-    actual = mean(fdr_actual, na.rm=T)
-    , hat_mean = mean(fdrhat_exp, na.rm=T)
-    , hat_median = quantile(fdrhat_exp, 0.5, na.rm=T)
-    , hat_low = quantile(fdrhat_exp, 0.1, na.rm=T)
-    , median = median(fdr_actual/fdrhat_mix)
-  )
+
+# load data
+load('../data/emp_data.Rdata')
+
+# balanced data
+retwide = pivot_wider(
+  emp_retbal
+  , c(signalname,date,ret), names_from = signalname, values_from = ret
+) %>% 
+  select(-date) %>% 
+  filter(complete.cases(.))
+retmat = as.matrix(retwide) 
+
+# generate residuals
+rbar = colMeans(retmat) %>% as.matrix() %>% t()
+l = 1+integer(nrow(retmat)) %>% as.matrix 
+ematemp = retmat - l %*% rbar
+Nemp = dim(ematemp)[2]
+Temp = dim(ematemp)[1]
+
+nblock = 10
+T_ = 100
+
+N = 2000
+pnull = 0.5
+Emualt = 0.5
+tgood = 2.6
+smarg = 0.5
+
+emat = ematemp
+rho = 0.5
+i = sample(1:dim(emat)[2], N, replace = T)
+t = sample(1:dim(emat)[1], T_, replace = T)
+
+
+noise = matrix(rnorm(N*T_,0,5), N, T_)
+emat2 = rho*emat[t,i]+(1-rho)*noise
+ebar = colMeans(emat2)
+evol = sqrt(colMeans(emat2^2))
+
+temp = cor(emat2)
+
+# clean and output
+estat = data.frame(
+  bar = ebar
+  , vol = evol
+)
+
+
+tdat = estat_to_tdat(N, T_, pnull, Emualt, estat)
+tdatpub = tdat_to_tdatpub(tdat, tgood = tgood, smarg = smarg )
+
+tbarlist = seq(0,6,0.5)
+fdr_actual = estimate_fdr(
+  tdat$t, tbarlist = tbarlist, null = tdat$null
+) %>% 
+  transmute(tbar, dr_actual = dr, fdr_actual)
+
+
+# hand estimate
+shapehat = mean(tdatpub$t[tdatpub$t>2.6]) - tgood
+tsim = rexp(1e5, 1/shapehat)
+
+fdr_actual %>% 
+  mutate(
+    # dr_hat = round(exp(-tbar/shapehat) , 4)
+    dr_hat = round( 1-pexp(tbar, 1/shapehat) , 4)
+    , fdr_hat = round( 2*pt(-tbar,100)/dr_hat, 4)
+    , actual_hat = fdr_actual/fdr_hat
+  ) 

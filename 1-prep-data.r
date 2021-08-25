@@ -6,6 +6,8 @@
 # ENVIRONMENT ====
 
 rm(list = ls())
+source('0-functions.r')
+detach_all()
 library(tidyverse)
 library(data.table)
 library(googledrive)
@@ -44,7 +46,10 @@ target_dribble = pathRelease %>% drive_ls() %>%
 
 drive_download(target_dribble, path = '../data/SignalDocumentation.xlsx', overwrite = T)
 
-# import
+# PROCESS DATA ====
+
+## import into R ====
+
 ret0 = fread('../data/PredictorPortsFull.csv') %>% 
   filter(port=='LS') %>% 
   select(signalname, date, ret)
@@ -56,7 +61,6 @@ header = read_excel('../data/SignalDocumentation.xlsx',sheet='BasicInfo') %>%
   ) %>% 
   rename(signalname=Acronym)
 
-# PROCESS DATA ====
 
 ## benchmark data ====
 # add sample info
@@ -78,7 +82,8 @@ signalsum = ret %>%
     rbar = mean(ret)
     , vol = sd(ret)
     , nmonth = n()
-    , t = rbar/vol*sqrt(nmonth)
+    , traw = rbar/vol*sqrt(nmonth)
+    , t = abs(traw)
   )
 
 monthsum = ret %>% 

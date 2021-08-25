@@ -210,29 +210,39 @@ tdat_to_tdatpub = function(tdat, tbad=1.96, tgood=2.6, smarg=0.5, sbar=1){
     select(-pub)
 } # end function 
 
-estatsim = function(N, T_){
-  # emat is a global
+estatsim = function(emat, N, T_){
   
   Nperblock = dim(emat)[2]
   nblock = floor(N/Nperblock)+1
+  Nemat = dim(emat)[2]
   
-  # first draw a ton of residuals
-  imonth  = sample(1:Temat, nblock*T_ , replace = T) # draw list of months
-  esim = emat[imonth, ] %>% as.matrix
+  # # first draw a ton of residuals
+  # imonth  = sample(1:dim(emat)[1], nblock*T_ , replace = T) # draw list of months
+  # esim = emat[imonth, ] %>% as.matrix
+  # 
+  # # average within blocks 
+  # tic = Sys.time()
+  # ebar = numeric(nblock*Nemat)
+  # evol = ebar
+  # for (blocki in 1:nblock){
+  #   tstart = (blocki-1)*T_ + 1
+  #   tend = tstart + T_ - 1
+  #   
+  #   Nstart = (blocki-1)*Nemat + 1
+  #   Nend = Nstart + Nemat - 1
+  #   ebar[Nstart:Nend] = colMeans(esim[tstart:tend, ])
+  #   evol[Nstart:Nend] = sqrt(colMeans(esim[tstart:tend, ]^2))
+  # }
   
-  # average within blocks 
-  tic = Sys.time()
-  ebar = numeric(nblock*Nemat)
-  evol = ebar
-  for (blocki in 1:nblock){
-    tstart = (blocki-1)*T_ + 1
-    tend = tstart + T_ - 1
-    
-    Nstart = (blocki-1)*Nemat + 1
-    Nend = Nstart + Nemat - 1
-    ebar[Nstart:Nend] = colMeans(esim[tstart:tend, ])
-    evol[Nstart:Nend] = sqrt(colMeans(esim[tstart:tend, ]^2))
-  }
+  # test
+  rho = 0.9
+  i = sample(1:dim(emat)[2], N, replace = T)
+  t = sample(1:dim(emat)[1], T_, replace = T)
+  noise = matrix(rnorm(N*T_,0,5), T_, N)
+  emat2 = rho*emat[t,i]+(1-rho)*noise
+  ebar = colMeans(emat2)
+  evol = sqrt(colMeans(emat2^2))
+  
   
   # clean and output
   estat = data.frame(
@@ -242,7 +252,7 @@ estatsim = function(N, T_){
 } # end ebarsim
 
 # function for generating observables and nulls
-estat_to_tdat = function(N,pnull,Emualt,estat){
+estat_to_tdat = function(N,T_,pnull,Emualt,estat){
   
   # adjust for true
   nnull = sum(runif(N) < pnull)
@@ -262,16 +272,17 @@ estat_to_tdat = function(N,pnull,Emualt,estat){
 
 
 average_many_sims = function(
-  N, T_, pnull, Emualt, tgood, smarg
+  emat, N, T_, pnull, Emualt, tgood, smarg
   , nsim 
-  , tgoodhat, pnullhat, shapehat
+  , tgoodhat, pnullhat, shapehat, nulldf
+  , tbarlist
 ){
   simmany = data.frame()
   for (simi in 1:nsim){
     print(paste0('simulation number ', simi))
     
-    estat = estatsim(N, T_)
-    tdat = estat_to_tdat(N, pnull, Emualt, estat)
+    estat = estatsim(emat, N, T_)
+    tdat = estat_to_tdat(N, T_, pnull, Emualt, estat)
     tdatpub = tdat_to_tdatpub(tdat, tgood = tgood, smarg = smarg )
     
     # actual fdr
@@ -380,3 +391,11 @@ histcomp = function(
   
   grid.arrange(p1, p2, nrow=1)  
 } # end function
+
+
+# colors
+
+niceblue = "#619CFF"
+nicegreen = "#00BA38"
+nicered = "#F8766D"
+

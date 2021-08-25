@@ -23,7 +23,7 @@ qlist = seq(0.1,0.9,0.1)
 # SUMMARY STATS ====
 
 ## univariate
-tab_univar_quantiles = emp_sum %>% select(-signalname) %>% 
+tab_univar_quantiles = emp_sum %>% select(-signalname,traw) %>% 
   apply(2, quantile, probs=qlist) %>% 
   t()
 
@@ -58,15 +58,7 @@ row.names(tab_corr_quantiles) = c('pairwise','subset complete')
 
 
 ## table prep
-
-
-# 
 finalMatrix <- rbind(tab_univar_quantiles, tab_corr_quantiles)
-
-# Need to make these numbers shorter. Otherwise, they won't fit in one page.
-finalMatrix <- round(finalMatrix, 1)
-finalMatrix[3,] = as.integer(round(finalMatrix[3,],0))
-finalMatrix
 
 # Take transpose
 finalMatrix <- t(finalMatrix)
@@ -80,12 +72,12 @@ finalMatrix <- t(finalMatrix)
 colnames(finalMatrix) <- gsub("\\%", "", colnames(finalMatrix))
 
 # Specify rownames
-rownames(finalMatrix) <- c(Hmisc::latexTranslate("| t |"),
-                           "Mean Return",
-                           "Volatility",
-                           "Num of Obs",
-                           "Pairwise",
-                           "Subset Complete")
+rownames(finalMatrix) <- c("$| t_i |$",
+                           "Mean Return (\\%)",
+                           "Volatility (\\%)",
+                           "Num of Months",
+                           "Largest Overlapping",
+                           "Balanced Panel")
 
 
 ## table 
@@ -97,15 +89,8 @@ capture.output(
                title = '',
                table.env=F,
                cgroup = "Percentile",
-               n.cgroup = 9,
-               rgroup = c("Section 1", "Section 2"),
-               n.rgroup = c(length(row.names(tab_univar_quantiles)),
-                            length(row.names(tab_corr_quantiles))),
-               cgroupTexCmd = "normalfont",
-               rgroupTexCmd = "normalfont",
-               col.just = c('c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'), 
                colhead = colnames(finalMatrix),
-               math.row.names = F,
+               already.math.row.names = T, 
                first.hline.double = FALSE,
                insert.bottom = "",
                rdec = c(2, 2, 2, 0, 2, 2)),
@@ -119,8 +104,7 @@ tgood = 2.6
 nulldf = 100
 C = 6.7
 
-tbarlist = quantile(emp_sum$t, seq(0.1,0.6,0.1))
-tbarlist = tbarlist[tbarlist > tgood]
+tbarlist = seq(2.6,4.0,0.4)
 
 fdr = estimate_fdr(emp_sum$t, tbarlist, C=C, nulldf=nulldf)
 
@@ -152,12 +136,15 @@ temp = Hmisc::latex(
   , title = NULL
   , rowname= c(
     ''
-    ,'$p$-value for $\\bar{t}$'
+    ,'$p$-value for $\\bar{t}$ (\\%)'
     ,'Share of Selected $|t_i|>\\bar{t}$ (\\%)'
-    ,'$\\widehat{\\text{FDR}}_{N,\\text{BHS}}(\\bar{t})$ (\\%)'
-    ,'$\\widehat{\\text{FDR}}_{N}(\\bar{t})$ (\\%)'
+    ,'Naive $\\widehat{\\text{FDR}}_{N,\\text{BHS}}(\\bar{t})$ (\\%)'
+    ,'$\\widehat{\\text{FDR}}_{N,\\text{NP}}(\\bar{t})$ (\\%)'
     )
   , already.math.row.names = T
   , na.blank = T
   , rdec = c(2,1, 1,1,1)
 )
+
+rm(temp)
+tabme
