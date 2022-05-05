@@ -1,6 +1,11 @@
 # 2021 08 Andrew
 # frequently used functions for bh with pub bias
 
+# PATHS ====
+
+dir.create('../data/', showWarnings = F)
+dir.create('../results/', showWarnings = F)
+
 # RANDOM VARIABLES ====
 
 # DENSITY
@@ -240,13 +245,15 @@ estatsim = function(emat, N, T_, exmethod, expar, outputmat = F){
   } else if (exmethod == 'eznoise'){
     # giant emat redraw, remove redudandancy with noise
     
-    rho = expar
+    weight_emp = expar
     i = sample(1:dim(emat)[2], N, replace = T)
     t = sample(1:dim(emat)[1], T_, replace = T)
     noise = matrix(rnorm(N*T_,0,5), T_, N)
-    emat2 = rho*emat[t,i]+(1-rho)*noise
-    ebar = colMeans(emat2)
-    evol = sqrt(colMeans(emat2^2))
+    emat2 = weight_emp*emat[t,i]+(1-weight_emp)*noise
+
+    ebar = apply(emat2, 2, mean, na.rm=T)
+    evol = apply(emat2, 2, sd, na.rm=T)
+    enmonth = apply(emat2, 2, function(x) sum(!is.na(x)))
     
   } # end if exmethod
   
@@ -254,6 +261,7 @@ estatsim = function(emat, N, T_, exmethod, expar, outputmat = F){
   estat = data.frame(
     bar = ebar[1:N]
     , vol = evol[1:N]
+    , nmonth = enmonth[1:N]
   )
   
   if (outputmat){
@@ -407,9 +415,18 @@ histcomp = function(
 } # end function
 
 
-# colors
 
-niceblue = "#619CFF"
-nicegreen = "#00BA38"
-nicered = "#F8766D"
+# AESTHETICS ====
+
+library(latex2exp)
+library(extrafont)
+
+
+MATBLUE = rgb(0,0.4470,0.7410)
+MATRED = rgb(0.8500, 0.3250, 0.0980)
+MATYELLOW = rgb(0.9290, 0.6940, 0.1250)
+
+NICEBLUE = "#619CFF"
+NICEGREEN = "#00BA38"
+NICERED = "#F8766D"
 

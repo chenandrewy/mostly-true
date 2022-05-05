@@ -1,7 +1,7 @@
 # 2021 08 Andrew
 # Simulation verification
 
-# ENVIRONMENT ====
+# SETUP ====
 rm(list=ls())
 library(data.table)
 library(tidyverse)
@@ -9,46 +9,62 @@ library(ggplot2)
 library(ggthemes)
 library(gridExtra)
 library(latex2exp)
-debugSource('0-functions.r')
+source('0-functions.r')
 
-# load data
+## make empirical residual matrices  ====
+
 load('../data/emp_data.Rdata')
 
-# balanced data
-retwide = pivot_wider(
-  emp_retbal
-  , c(signalname,date,ret), names_from = signalname, values_from = ret
-) %>% 
+# cz residuals
+emat_cz = emp_retbal %>% 
+  group_by(signalname) %>% 
+  mutate(
+    ret = as.vector(scale(ret, center = T, scale = F))
+  ) %>% 
+  pivot_wider(
+   c(signalname,date,ret), names_from = signalname, values_from = ret
+  ) %>% 
   select(-date) %>% 
-  filter(complete.cases(.))
-retmat = as.matrix(retwide) 
+  as.matrix
 
-# generate residuals
-rbar = colMeans(retmat) %>% as.matrix() %>% t()
-l = 1+integer(nrow(retmat)) %>% as.matrix 
-ematemp = retmat - l %*% rbar
-Nemp = dim(ematemp)[2]
-Temp = dim(ematemp)[1]
+# yz residuals
+emat_yz = yz_retbalsigned %>% 
+  group_by(signalname) %>% 
+  mutate(
+    ret = as.vector(scale(ret, center = T, scale = F))
+  ) %>% 
+  pivot_wider(
+    c(signalname,date,ret), names_from = signalname, values_from = ret
+  ) %>% 
+  select(-date) %>% 
+  as.matrix
 
 
-# SIMULATION VERIFICATION ====
 
 
+## Shared Parameters ====
 
-## SETTINGS ====
-
-# dimentions, errors
+# dimensions
 N = 1e4
 T_ = 200
-exmethod = 'eznoise'
-exrho = 0.9
+nsim = 100
+nsim_large = 100
 
-# fdr parameters
+# fdr truth
 pnull_small  = 0.5
 Emualt_small = 0.5
 
 pnull_large = 0.99
 Emualt_large = 0.25
+
+# fdr est
+nulldfhat = 100
+tbarlist = seq(0,12,0.1)
+
+## Semi-Parametric Parameters ====
+
+exmethod = 'eznoise'
+weight_emp = 0.9 # weight on empirical bootstrap
 
 # bias parameters
 tgood_real = 2.6
@@ -57,26 +73,44 @@ smarg_real = 0.5
 tgood_cray = 5.0
 smarg_cray = 0.25
 
-# number of sims, 
-nsim = 100
-nsim_large = 100
-tbarlist = seq(0,12,0.1)
-
 # tuning parameters
 tgoodhat = 2.6
 pnullhat = 0
 shapehat = 1/2
-nulldfhat = 100
 
-## SIMULATE AND COMPARE CORRELATION MATRIX ====
+# CHECK NON-PAR ESTIMATE ====
 
-if (F){
+estat = estatsim(
+  emat = emat_yz, N = N, T_ = T_, exmethod = 'eznoise', expar = 1, outputmat = F
+)
+
+temp %>% pull(t) %>% hist()
+temp$t %>% sd()
+
+weight_emp = 1.0
+
+tdat = estat_to_tdat(N, T_, pnull_small, Emualt_small, estat)
+tdatpub = tdat_to_tdatpub(tdat, tgood = 0, smarg = 1 )
+
+temp = estimate_fdr(t = tdatpub$t, null = tdatpub$null)
+temp
+
+
+# CHECK SEMI-PARAMETRIC ESTIMATE ====
+
+
+
+
+## COR MATRIX FIGURE ====
+# this can be a bit slow
+
+if (T){
   esim = estatsim(
     emat = ematemp
     , N = N
     , T_ = T_
     , exmethod = exmethod
-    , expar = exrho
+    , expar = weight_emp
     , outputmat = T
   )
   
@@ -154,7 +188,7 @@ manysum_real_small = average_many_sims(
   , N = N
   , T_ = T_
   , exmethod = exmethod
-  , expar = exrho
+  , expar = weight_emp
   , pnull = pnull_small
   , Emualt = Emualt_small
   , tgood = tgood_real
@@ -174,7 +208,7 @@ manysum_real_large = average_many_sims(
   , N = N
   , T_ = T_
   , exmethod = exmethod
-  , expar = exrho
+  , expar = weight_emp
   , pnull = pnull_large
   , Emualt = Emualt_large
   , tgood = tgood_real
@@ -193,7 +227,7 @@ manysum_cray_small = average_many_sims(
   , N = N
   , T_ = T_
   , exmethod = exmethod
-  , expar = exrho
+  , expar = weight_emp
   , pnull = pnull_small
   , Emualt = Emualt_small
   , tgood = tgood_cray
@@ -213,7 +247,7 @@ manysum_cray_large = average_many_sims(
   , N = N
   , T_ = T_
   , exmethod = exmethod
-  , expar = exrho
+  , expar = weight_emp
   , pnull = pnull_large
   , Emualt = Emualt_large
   , tgood = tgood_cray
