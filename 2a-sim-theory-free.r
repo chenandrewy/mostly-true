@@ -6,12 +6,31 @@ source('0-functions.r')
 
 load('../data/emp_data.Rdata')
 
-# MAKE RESIDUALS  ====
+## settings ====
 
-# parameters for balanced panel
+# data cleaning 
 min_nmonth = 200
-min_nsignal = 150
+min_nsignal = 100
 
+# dimensions
+ndate = 500
+nsim = 100
+
+# parameters
+pF_list     = c(0.25, 0.5, 0.75, 0.9, 0.95, 0.99)
+mutrue_list = c(0.25, 0.5, 0.75)
+
+parlist = expand_grid(pF = pF_list, mutrue = mutrue_list)
+
+# seed
+set.seed(1120)
+
+# fdr estimation
+h_disc = 2 # cutoff for a discovery
+fdrhat_numer = 0.05 # plug in this for Pr(F|disc)
+
+
+# PREP RESIDUALS  ====
 yzmonthsum = yz_ret %>%
   group_by(date) %>%
   summarize(nsignal = sum(!is.na(ret)))
@@ -37,27 +56,94 @@ emat = resid %>%
     id_cols = c(signalname,date,e)
     , names_from = signalname
     , values_from = e
+    ) %>% 
+  select(-date) %>% 
+  as.matrix() 
+
+N = dim(emat)[2]
+
+# FIG: COR DIST ====
+
+# simulate residuals once
+set.seed(339)
+dateselect = sample(1:dim(emat)[1], ndate, replace = T)
+eboot = emat[dateselect, ]
+
+# select subset to plot (otherwise it takes forever)
+nplot = 1000
+isim = sample(1:N, nplot, replace = F)
+iemp = sample(1:length(unique(yz_ret$signalname)), nplot, replace = F)
+
+# find correlation matricies
+csim = cor(eboot[ , isim], use = 'pairwise.complete.obs')
+csim2 = csim[lower.tri(csim)]
+
+temp = yz_ret %>% 
+  pivot_wider(
+    names_from = signalname, values_from = ret
+  ) %>% 
+  select(-date)
+cemp = cor(temp[ , iemp], use = 'pairwise.complete.obs')
+cemp2 = cemp[lower.tri(cemp)]
+
+cdat = data.frame(
+  c = csim2, group = 'sim', color = NICEBLUE
+) %>% rbind(
+  data.frame(
+    c = cemp2 , group = 'emp', color = 'gray'
+  ) 
+)
+
+edge = seq(-1,1,0.05)
+plotme = cdat %>% 
+  group_by(group) %>% 
+  summarise(
+    cmid = hist(c,edge)$mids
+    , density = hist(c,edge)$density
+  ) %>% 
+  mutate(
+    group = factor(
+      group
+      , levels = c('sim','emp')
+      , labels = c('Simulated','Yan-Zheng Data')
     )
+  )
+
+
+ggplot(
+  plotme, aes(x=cmid, y=density, group = group)
+) +
+  geom_line(
+    aes(linetype = group, color = group), size = 2
+  ) +
+  theme_economist_white(gray_bg = F) +
+  theme(
+    axis.title = element_text(size = 12)
+    , axis.text = element_text(size = 10)      
+    , legend.title = element_blank()
+    , legend.text = element_text(size = 10)
+    , legend.key.size = unit(0.1, 'cm')
+    , legend.position = c(80,80)/100
+    , legend.key.width = unit(1,'cm')    
+    , legend.spacing.y = unit(0.000001, 'cm')
+    , legend.background = element_rect(colour = 'black', fill = 'white')    
+  ) +
+  labs(
+    x = 'Pairwise Correlation'
+    , y = 'Density'
+  ) +
+  scale_color_manual(
+    values=c(NICEBLUE, 'gray')
+  ) +
+  scale_linetype_manual(values = c('solid','31'))
+
+
+ggsave(
+  filename = '../results/cor-theory-free.pdf', width = 5, height = 4
+)
+
 
 # SIMULATE MANY TIMES ====
-
-## settings ====
-
-# dimensions and randomization
-N = 1e4
-ndate = 500
-nsim = 100
-signalreplace = T
-
-# parameters
-pF_list     = c(0.5, 0.9)
-mutrue_list = c(0.2, 0.5)
-
-parlist = expand_grid(pF = pF_list, mutrue = mutrue_list)
-
-# seed
-set.seed(1120)
-
 
 for (simi in 1:nsim){
   tic = Sys.time()
@@ -66,40 +152,18 @@ for (simi in 1:nsim){
     paste0('sim-theory-free: simi = ', simi, ' nsim = ', nsim)
   )
   
-  ## sim noise ====
-  # noise is reused for different mu parameters, which is fine
-  # since I'm simulating nsim times anyway
-  # takes about 5 seconds
+  ## sim noise mat style ====
+  dateselect = sample(1:dim(emat)[1], ndate, replace = T)
+  eboot = emat[dateselect, ]
   
-  datelist = resid$date %>% unique()
-  signallist = resid$signalname %>% unique()
-  
-  datesim = sample(datelist, ndate, replace = T)
-  signalsim = sample(signallist, N, replace = signalreplace)
-      # signalsim = signallist[1:N] # no random signal
-  signallink = tibble(signalname = signalsim) %>% 
-    mutate(signalid = row_number())
-  
-  esim0 = expand.grid(
-    signalname = signalsim, date = datesim
-  ) %>% as_tibble() %>% 
-    left_join(signallink, by = 'signalname')
-  
-  esim = esim0 %>% inner_join(
-    resid %>% select(signalname, date, e) %>% filter(!is.na(e))
-    , by = c('signalname','date')
-  ) 
-  
-  # calculate noise's contribution to t-stat (early for speed)
-  ebarsim = esim %>% group_by(signalid) %>% summarize(
-    ebar = mean(e), vol = sd(e), ndate = n()
+  cross0 = tibble(
+    signalid = 1:N
+    , ebar = apply(eboot, 2, mean, na.rm=T)
+    , vol  = apply(eboot, 2, sd, na.rm=T)
+    , ndate  = apply(eboot, 2, function(x) sum(!is.na(x)))
   )
 
-  
-  ## sim cross ====
-  h_disc = 2
-  fdrhat_numer = 0.05
-  
+  # sim cross ====
   fdrlist = tibble()
   
   for (pari in 1:dim(parlist)[1]){
@@ -108,14 +172,12 @@ for (simi in 1:nsim){
     par = parlist[pari,]
     
     # simulate mu, rbar, tstat
-    cross = tibble(
+    cross = cross0 %>% 
+      mutate(
       signalid = 1:N
       , verity = runif(N) > par$pF
       , mu = verity*par$mutrue + (1-verity)*0
-    )  %>% 
-      left_join(
-        ebarsim, by = 'signalid'
-      ) %>% 
+    ) %>% 
       mutate(
         rbar = mu + ebar, tstat = rbar/vol*sqrt(ndate), tabs = abs(tstat)
       )
@@ -134,7 +196,7 @@ for (simi in 1:nsim){
     
   } # for pari
   
-  ## save to disk ====
+  # save to disk ====
   
   fdrlist = fdrlist %>% 
     mutate(simi = simi) %>% 
@@ -154,45 +216,54 @@ for (simi in 1:nsim){
   
 } # for simi
 
-# COMPUTE TABLE (TESTING) ====
 
+
+
+
+# TABLE: BOUND CHECK ====
+
+## compile sims ====
 csvlist = dir('../results/sim-theory-free/', full.names = T)
 
-fdrall = tibble()
+simdat = tibble()
 for (csvname in csvlist){
   temp = fread(csvname)
-  fdrall = rbind(fdrall, temp)
+  simdat = rbind(simdat, temp)
 } # for i 
 
-temp = fdrall %>% 
-  mutate(
-    err = fdrhat - fdp
-  )
 
-hist(temp$err)
-
-quantile(temp$err, seq(0,1,0.2))
-
-parstat = fdrall %>% 
+pardat = simdat %>% 
   group_by(pF, mutrue) %>% 
   summarize(
-    fdr = mean(fdp), fdrhat_mean = mean(fdrhat)
-  )
-
-temp = fdrall %>% 
-  left_join(parstat, by = c('pF','mutrue')) %>% 
-  mutate(
-    err = fdrhat - fdr
+    fdr = mean(fdp)
   ) 
 
-hist(temp$err)
-
-temp %>% 
-  group_by(pF, mutrue) %>% 
-  summarize(
-    p05 = quantile(err, 0.05)
-    , p25 = quantile(err, 0.25)
-    , p50 = quantile(err, 0.50)
-    , p75 = quantile(err, 0.75)
-    , p95 = quantile(err, 0.95)
+simdat = simdat %>% 
+  left_join(
+    pardat, by = c('pF','mutrue')
   )
+
+
+## table for output ====
+tabout = simdat %>% 
+  group_by(pF, mutrue) %>%
+  mutate(denom = fdr) %>% 
+  summarize(
+    x1_fdr = mean(fdp)*100
+    , x2_ave = mean(fdrhat/denom)
+    , x3_sd = -sd(fdrhat/denom)
+    , x4_pct_ok =-mean(fdrhat > denom) *100
+  ) %>% 
+  pivot_longer(
+    cols = starts_with('x'), names_to = 'stat', values_to = 'value'
+  ) %>% 
+  pivot_wider(
+    names_from = pF, names_prefix = 'pF_', values_from = 'value'
+  ) %>% 
+  arrange(
+    -mutrue, stat
+  )
+
+
+write_csv(tabout, '../results/tab-sim-theory-free.csv')
+

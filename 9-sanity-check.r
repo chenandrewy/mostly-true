@@ -230,11 +230,11 @@ kurtosis(trawnull)
 
 N = 1e3
 
-rho = 0.9
+weight_emp = 0.9
 i = sample(1:dim(emat)[2], N, replace = T)
 t = sample(1:dim(emat)[1], T_, replace = T)
 noise = matrix(rnorm(N*T_,0,5), T_, N)
-emat2 = rho*emat[t,i]+(1-rho)*noise
+emat2 = weight_emp*emat[t,i]+(1-weight_emp)*noise
 
 
 csim = cor(emat2)

@@ -85,31 +85,6 @@ cz_sum = cz_ret %>%
     , tabs = abs(traw)
   )
 
-monthsum = cz_ret %>% 
-  group_by(date) %>% 
-  summarize(nsignal = sum(!is.na(ret))) 
-
-
-## balanced panel data ====
-cz_retbal = cz_ret %>%
-  left_join(
-    cz_sum, by = 'signalname'
-  ) %>% 
-  left_join(
-    monthsum, by = 'date'
-  ) %>% 
-  filter(
-    nmonth >= min_nmonth, nsignal >= min_nsignal, !is.na(ret)
-  ) %>% 
-  select(signalname, date, ret) %>% 
-  pivot_wider(
-    c(signalname,date,ret), names_from = signalname, values_from = ret
-  ) %>% 
-  filter(complete.cases(.)) %>% 
-  pivot_longer(
-    cols = -date, names_to = 'signalname', values_to = 'ret'
-  )
-  
 
 
 # ADD YZ DATA ====
@@ -130,7 +105,6 @@ yz_ret = temp %>%
     signalname, date = DATE, ret = 100*ddiff_ew
   )
 
-
 # find summary stats
 yz_sum = yz_ret %>% 
   group_by(signalname) %>% 
@@ -138,44 +112,12 @@ yz_sum = yz_ret %>%
     rbar = mean(ret), vol = sd(ret), nmonth = n(), traw = rbar/vol*sqrt(nmonth), tabs = abs(traw)
   )
 
-yzmonthsum = yz_ret %>% 
-  group_by(date) %>% 
-  summarize(nsignal = sum(!is.na(ret))) 
-
-## balanced panel ====
-
-# min_nmonth and min_nsignal are the same as CZ data
-# unlike cz data, I enforce signs here, so the unsigned data can be used to square with yz
-yz_retbalsigned = yz_ret %>%
-  left_join(
-    yz_sum, by = 'signalname'
-  ) %>% 
-  left_join(
-    yzmonthsum, by = 'date'
-  ) %>% 
-  filter(
-    nmonth >= min_nmonth, nsignal >= min_nsignal, !is.na(ret)
-  ) %>% 
-  mutate(
-    ret = ret*sign(rbar)
-  ) %>% 
-  select(signalname, date, ret) %>% 
-  pivot_wider(
-    c(signalname,date,ret), names_from = signalname, values_from = ret
-  ) %>% 
-  # filter(complete.cases(.)) %>% 
-  pivot_longer(
-    cols = -date, names_to = 'signalname', values_to = 'ret'
-  )
-
-
 # SAVE TO DISK ====
 
 
 save(
   list = c(
-    'cz_ret','cz_sum','cz_retbal'
-    , 'yz_sum', 'yz_retbalsigned'
+    'cz_ret','cz_sum', 'yz_ret', 'yz_sum'
     )
   , file = '../data/emp_data.Rdata'
 )

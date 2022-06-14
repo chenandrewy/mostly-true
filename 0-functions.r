@@ -1,10 +1,19 @@
 # 2021 08 Andrew
 # frequently used functions for bh with pub bias
 
-# PATHS ====
+# PATHS AND LIBRARIES ====
 
 dir.create('../data/', showWarnings = F)
 dir.create('../results/', showWarnings = F)
+dir.create('../results/sim-theory-free/', showWarnings = F)
+dir.create('../results/sim-extrap-pub/', showWarnings = F)
+
+library(data.table)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(gridExtra)
+library(latex2exp)
 
 # RANDOM VARIABLES ====
 
@@ -200,95 +209,6 @@ estimate_exponential = function(
 
 # SIMULATION ====
 
-# tdat is a dataframe with columns (t, other stuff)
-tdat_to_tdatpub = function(tdat, tbad=1.96, tgood=2.6, smarg=0.5, sbar=1){
-  tdat$u = runif(dim(tdat)[1]) 
-  tdat = tdat %>% 
-    mutate(
-      pub = F
-      , pub = case_when(
-        t > tbad & t <= tgood & u < smarg ~ T
-        , t > tgood & u < sbar ~ T
-      )
-    ) %>% 
-    filter(pub) %>% 
-    select(-pub)
-} # end function 
-
-estatsim = function(emat, N, T_, exmethod, expar, outputmat = F){
-  
-  Nperblock = dim(emat)[2]
-  nblock = floor(N/Nperblock)+1
-  Nemat = dim(emat)[2]
-  
-  if (exmethod == 'block'){
-    # blocks of emat
-    
-    # first draw a ton of residuals
-    imonth  = sample(1:dim(emat)[1], nblock*T_ , replace = T) # draw list of months
-    esim = emat[imonth, ] %>% as.matrix
-    
-    ebar = numeric(nblock*Nemat)
-    evol = ebar    
-    for (blocki in 1:nblock){
-
-      
-      tstart = (blocki-1)*T_ + 1
-      tend = tstart + T_ - 1
-      
-      Nstart = (blocki-1)*Nemat + 1
-      Nend = Nstart + Nemat - 1
-      ebar[Nstart:Nend] = colMeans(esim[tstart:tend, ])
-      evol[Nstart:Nend] = sqrt(colMeans(esim[tstart:tend, ]^2))
-    }
-    
-  } else if (exmethod == 'eznoise'){
-    # giant emat redraw, remove redudandancy with noise
-    
-    weight_emp = expar
-    i = sample(1:dim(emat)[2], N, replace = T)
-    t = sample(1:dim(emat)[1], T_, replace = T)
-    noise = matrix(rnorm(N*T_,0,5), T_, N)
-    emat2 = weight_emp*emat[t,i]+(1-weight_emp)*noise
-
-    ebar = apply(emat2, 2, mean, na.rm=T)
-    evol = apply(emat2, 2, sd, na.rm=T)
-    enmonth = apply(emat2, 2, function(x) sum(!is.na(x)))
-    
-  } # end if exmethod
-  
-  # clean and output
-  estat = data.frame(
-    bar = ebar[1:N]
-    , vol = evol[1:N]
-    , nmonth = enmonth[1:N]
-  )
-  
-  if (outputmat){
-    return(emat2)
-  } else{
-    return(estat)
-  }
-  
-} # end ebarsim
-
-# function for generating observables and nulls
-estat_to_tdat = function(N,T_,pnull,Emualt,estat){
-  
-  # adjust for true
-  nnull = sum(runif(N) < pnull)
-  null = logical(N)
-  null[1:nnull] = T
-  mu = matrix(0, N)
-  mu[!null] = Emualt
-  
-  # observables
-  t = (mu + estat$bar)/estat$vol*sqrt(T_)
-  
-  # pack and output
-  data.frame(t = abs(t), null = null, mu = mu, traw = t)
-  
-} # end e_to_t
 
 
 

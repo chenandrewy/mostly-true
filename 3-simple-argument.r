@@ -1,4 +1,4 @@
-# super simple now
+# super simple now (2022 04)
 
 
 # SETUP ====
@@ -9,79 +9,7 @@ library(data.table)
 load('../data/emp_data.Rdata')
 
 
-tabs_cut = 1.96
-
-
-
-# NON-PARAMETRIC ====
-
-F_yz = ecdf(yz_sum$tabs)
-
-
-Pr_disc = 1-F_yz(tabs_cut)
-
-fdrmax = 2*(1-pnorm(tabs_cut))/Pr_disc
-
-fdrmax
-
-n_yz = length(yz_sum$tabs)
-
-edge = seq(0,10,0.5)
-
-plotme = make_dist_dat(F_yz, edge, F_yz, edge, N1 = n_yz)
-
-
-## plot ====
-
-ggplot(plotme, aes(x=mids, y=dF)) +
-  geom_bar(
-    data = plotme %>% filter(group == 1)
-    , stat = 'identity', position = 'identity', fill = 'gray'
-    , aes(fill = group)
-  ) +
-  coord_cartesian(xlim = c(0,8)) +
-  theme(
-    legend.position = c(0.7, 0.7)
-  ) +
-  xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
-  ylab('Number of Strategies') +
-  # discovery line
-  geom_vline(xintercept = 1.96, color = NICERED) +
-  annotate(
-    geom = 'text', label = TeX('$|t_i| = 1.96$')
-    , x = 26/10, y = 4000, color = NICERED
-  ) +
-  # write out intuition
-  geom_segment(
-    aes(
-      xend = 3, yend = 500
-      , x = 3.2, y = 2300
-    ),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.3
-  ) +  
-  annotate(
-    geom = 'text', label = TeX(paste0('Pr($|t_i|>1.96$) = ', round(Pr_disc,2)))
-    , x = 3.7, y = 2600
-  ) +
-  annotate(
-    geom = 'text', label = TeX(paste0(
-    'FDR $\\leq \\frac{5\\%}{', round(Pr_disc,2), '}$ = ',  round(fdrmax, 3)*100, '%'
-    ))
-    , x = 6.7, y = 1800
-  )   
-
-ggsave('../results/yz-intuition.pdf', scale = 0.6, device = cairo_pdf)
-
-
-# SEMI-PARAMETRIC ====
-theme_set(
-  theme_minimal() +
-    theme(
-      text = element_text(family = "Palatino Linotype")
-    )
-)
-
+tabs_cut = 2
 
 # creates data for comparing cdf F1 to cdf F2 in a plot
 make_dist_dat = function(F1, edge1, F2, edge2, x_match = c(-Inf,Inf), N1 = 1, showplot = F){
@@ -115,35 +43,92 @@ make_dist_dat = function(F1, edge1, F2, edge2, x_match = c(-Inf,Inf), N1 = 1, sh
   
 } # make_dist_dat
 
+## set theme ====
+theme_set(
+  theme_minimal() +
+    theme(
+      text = element_text(family = "Palatino Linotype")
+    )
+)
 
-mean_all = mean_pub - fit_cut
 
-mean_all = 2.07 # from HLZ page 52 Panel A
 
-Pr_disc = exp(-1/mean_all*1.96)
 
-fdrmax = 2*(1-pnorm(tabs_cut))/Pr_disc
+# NON-PARAMETRIC ====
 
-fdrmax
+# fdr calculations
+F_yz = ecdf(yz_sum$tabs)
+Pr_disc = 1-F_yz(tabs_cut)
+# Pr_disc_F = 2*(1-pnorm(tabs_cut))
+Pr_disc_F = 0.05
+fdrmax = Pr_disc_F/Pr_disc
+n_yz = length(yz_sum$tabs)
 
+# make data for plotting 
+edge = seq(0,10,0.5)
+plotme = make_dist_dat(F_yz, edge, F_yz, edge, N1 = n_yz)
+
+# plot 
+ggplot(plotme, aes(x=mids, y=dF)) +
+  geom_bar(
+    data = plotme %>% filter(group == 1)
+    , stat = 'identity', position = 'identity', fill = 'gray'
+    , aes(fill = group)
+  ) +
+  coord_cartesian(xlim = c(0,8)) +
+  theme(
+    legend.position = c(0.7, 0.7)
+  ) +
+  xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
+  ylab('Number of Strategies') +
+  # discovery line =
+  geom_vline(xintercept = tabs_cut, color = NICERED) +
+  # write out intuition =
+  geom_segment(
+    aes(
+      xend = 27/10, yend = 500
+      , x = 3.2, y = 2300
+    ),
+    arrow = arrow(length = unit(0.03, "npc")),
+    colour = "black", size = 0.1
+  ) +  
+  annotate(
+    geom = 'text', label = TeX(paste0('Pr($|t_i|>', tabs_cut, '$) = ', round(Pr_disc,2)))
+    , x = 3.7, y = 2600
+  ) +
+  annotate(
+    geom = 'text', label = TeX(paste0(
+    'FDR $\\leq \\frac{5\\%}{', round(Pr_disc,2), '}$ = ',  round(fdrmax, 3)*100, '%'
+    ))
+    , x = 6.7, y = 1800
+  )   
+
+ggsave('../results/yz-intuition.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+
+
+# SEMI-PARAMETRIC ====
+
+# fdr calculations
+mean_all = 2.0 # 2.0 is just easier
+Pr_disc = exp(-1/mean_all*tabs_cut)
+# Pr_disc_F = 2*(1-pnorm(tabs_cut))
+Pr_disc_F = 0.05
+fdrmax = Pr_disc_F/Pr_disc
+
+# make data for plotting
 F_cz = ecdf(cz_sum$tabs)
 n_cz = length(cz_sum$tabs)
 edge_cz = seq(0,10,0.5)
-
 F_fit = function(tabs) pexp(tabs, rate = 1/mean_all)
-edge_fit = seq(0,10,0.1)
 
+edge_fit = seq(0,10,0.1)
 plotme = make_dist_dat(
   F_cz, edge_cz, F_fit, edge_fit, x_match = c(3.0,Inf), N1 = n_cz, showplot = T
 )
 
-plotme %>% 
-  ggplot(aes(x=mids, y=dF)) +
-  geom_line(aes(color = group)) +
-  ylim(0, 100)
 
-
-
+# plot
 ggplot(data = plotme, aes(x=mids, y=dF)) +
   geom_bar(
     data = plotme %>% filter(group == 1)
@@ -159,18 +144,14 @@ ggplot(data = plotme, aes(x=mids, y=dF)) +
   scale_color_manual(
     values = MATBLUE, labels = 'Extrapolated', name = NULL
   ) +
-  geom_vline(xintercept = 1.96) +
+  geom_vline(xintercept = tabs_cut) +
   xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
   ylab('Number of Strategies') +
   scale_x_continuous(
     breaks = seq(0,14,2)
   ) +
   # discovery line
-  geom_vline(xintercept = 1.96, color = NICERED) +
-  annotate(
-    geom = 'text', label = TeX('$|t_i| = 1.96$')
-    , x = 26/10, y = 4000, color = NICERED
-  ) +
+  geom_vline(xintercept = tabs_cut, color = NICERED) +
   # write out intuition  
   geom_segment(
     aes(
@@ -178,25 +159,30 @@ ggplot(data = plotme, aes(x=mids, y=dF)) +
       , x = 3.0, y = 60
     ),
     arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.3
+    colour = "black", size = 0.1
   ) +  
   annotate(
-    geom = 'text', label = TeX(paste0('Pr($|t_i|>1.96$) = ', round(Pr_disc,2)))
-    , x = 3.7, y = 70
+    geom = 'text', label = TeX(paste0('Pr($|t_i|>', tabs_cut, '$) = ', round(Pr_disc,2)))
+    , x = 42/10, y = 70
   ) +
   annotate(
     geom = 'text', label = TeX(paste0(
-      'FDR $\\leq \\frac{5\\%}{', round(Pr_disc,2), '}$ = ',  round(fdrmax, 3)*100, '%'
+      'FDR $\\leq \\frac{', round(Pr_disc_F, 3)*100
+      , '\\%}{'
+      , round(Pr_disc,2), '}$ = ',  round(fdrmax, 3)*100, '%'
     ))
-    , x = 6.7, y = 40
+    , x = 68/10, y = 40
   ) + 
   theme(
     legend.position = c(75,75)/100
     , legend.margin = margin(t = -15, r = 20, b = 0, l = 5),
+  ) +
+  coord_cartesian(
+    xlim = c(0,8)
   )
 
 
   
 
-ggsave('../results/hlz-intuition.pdf', scale = 0.6, device = cairo_pdf)
+ggsave('../results/hlz-intuition.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
