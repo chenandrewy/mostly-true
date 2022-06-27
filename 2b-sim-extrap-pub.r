@@ -379,10 +379,11 @@ tabout %>%
 
 set.seed(934)
 
+# settings
 tgoodhat = 2
 
 par = data.frame(
-  pF = 0.80, mutrue = 0.75, tgood = 2.6, tbad = 1.96, smarg = 0.5
+  pF = 0.8, mutrue = 0.25, tgood = 2.6, tbad = 1.96, smarg = 0.5
 )
 
 
@@ -440,23 +441,109 @@ stat.fdr = cross %>%
     , b_alt = fdrhat_alt >= fdp
   )
 
-stat.fdr
+
 
 ## plot ====
 
 
-# make data for plotting
-F_cz = ecdf(pubcross$tabs)
-n_cz = length(pubcross$tabs)
-edge = seq(0,10,0.5)
+edge = seq(0,10,0.2)
+tabs_match = 3
+
+edge_fit = seq(0,10,0.1)
 F_fit = function(tabs) pexp(tabs, rate = 1/lambda)
+
+match_fac = sum(cross$tabs > tabs_match) / (1-F_fit(tabs_match)) *
+      diff(edge)[1] /diff(edge_fit)[1]
+
+
+tempdat = tibble(
+  edge = edge_fit, Fdat = F_fit(edge_fit)*match_fac
+) %>% 
+  mutate(
+    dF = Fdat - lag(Fdat), mids = 0.5*(edge + lag(edge)), pub = T, verity = T
+  ) %>% 
+  filter(!is.na(dF))
+
+xlimnum = c(0, quantile(cross$tabs, 0.99)*1.2)
+ylimnum = c(0, max(tempdat$dF)*1)
+
+
+p1 = ggplot(cross, aes(x=tabs, group = pub)) +
+  geom_histogram(aes(fill = pub), breaks = edge, position = 'stack') +
+  geom_line(
+    data = tempdat, aes(x=mids, y=dF)
+  ) + 
+  geom_vline(xintercept = tgoodhat) +
+  theme(legend.position = c(7,7)/10) +
+  coord_cartesian(xlim = xlimnum)
+
+
+p2 = ggplot(cross, aes(x=tabs, group = verity)) +
+  geom_histogram(aes(fill = verity), breaks = edge, position = 'stack') +
+  geom_line(
+    data = tempdat, aes(x=mids, y=dF)
+  ) +
+  scale_fill_brewer() +
+  geom_vline(xintercept = tgoodhat) +
+  theme(legend.position = c(7,7)/10) +
+  coord_cartesian(xlim = xlimnum)
+
+p3 = ggplot(pubcross, aes(x=tabs, group = verity)) +
+  geom_histogram(aes(fill = verity), breaks = edge, position = 'stack') +
+  geom_line(
+    data = tempdat, aes(x=mids, y=dF)
+  ) +
+  scale_fill_economist() +
+  geom_vline(xintercept = tgoodhat) +
+  theme(legend.position = c(7,7)/10) +
+  coord_cartesian(xlim = xlimnum) +
+  ylab('count, pub only')
+
+if (F){
+  ylimmax = 2200
+  p1 = p1 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
+  p2 = p2 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
+  p3 = p3 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
+}
+
+grid.arrange(p1,p2,p3, nrow = 1)
+
+# show stats to console
+stat.fdr
+
+# old ====
+
+
 
 F_cz = ecdf(cross$tabs)
 
-edge_fit = seq(0,10,0.1)
+rescale_fac = diff(F1(x_match))/diff(F2(x_match)) * diff(edge1)[1] /diff(edge2)[1]
+
+dat = tibble(
+  edge = edge1, F = F1(edge1), group = 1
+) %>% 
+  rbind(
+    tibble(
+      edge = edge2, F = F2(edge2)*rescale_fac, group = 2
+    )
+  ) %>% 
+  group_by(group) %>% 
+  mutate(
+    F = N1*F
+    , dF = F - lag(F)
+    , mids = 0.5*(edge + lag(edge))
+    , group = factor(group, levels = c(1,2))
+  ) %>% 
+  filter(!is.na(dF))
+
+
+
 plotme = make_dist_dat(
   F_cz, edge, F_fit, edge_fit, x_match = c(3.0,Inf), N1 = n_cz, showplot = T
 )
+
+
+
 
 
 sum(is.na(cross$pub))
@@ -478,7 +565,7 @@ ggplot(data = plotme, aes(x=mids, y=dF)) +
     values = MATBLUE, labels = 'Extrapolated', name = NULL
   )
 
-## old ====
+# old ====
 
 quantile(pubcross %>% filter(tabs>tgoodhat) %>% pull(tabs))
 
