@@ -84,7 +84,7 @@ make_dist_dat = function(F1, edge1, F2, edge2, x_match = c(-Inf,Inf), N1 = 1, sh
 } # make_dist_dat
 
 
-## settings ====
+## User entry ====
 
 # data cleaning 
 min_nmonth = 200
@@ -113,6 +113,10 @@ parlist = expand_grid(
   , tbad
   , smarg
 )
+parlist = parlist %>% 
+  mutate(pari = 1:dim(parlist)[1]) %>% 
+  select(pari, everything())
+
 
 # seed
 set.seed(1120)
@@ -123,8 +127,7 @@ set.seed(1120)
 
 h_disc = 2.0 # cutoff for a discovery
 fdrhat_numer = 0.05
-
-tgoodhat = 2.6
+tgoodhat = 2.0 # now has to be the same as h_disc
 
 
 ## Prep Residuals  ====
@@ -242,6 +245,8 @@ ggsave(
 
 # SIMULATE MANY TIMES ====
 
+truthlist = tibble()
+estlist = tibble()
 for (simi in 1:nsim){
   tic = Sys.time()
   
@@ -253,7 +258,6 @@ for (simi in 1:nsim){
   cross0 = sim_noise(emat, N, ndate, weight_emp, vol_noise)
   
   # loop over different par in parlist
-  fdrlist = tibble()
   for (pari in 1:dim(parlist)[1]){
     
     # load par
@@ -263,88 +267,82 @@ for (simi in 1:nsim){
     cross = sim_other_stuff(cross0, N, par)
     pubcross = cross %>% filter(pub)
     
-    # estimate lambda
-    mean_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% mean()
-    lambda = mean_tabs_good - tgoodhat
+    # summarize truth
+    truth = par %>% 
+      mutate(
+        npub = dim(pubcross)[1]
+        , h_disc = h_disc
+        , fdp = mean(!cross$verity[cross$tabs > h_disc])
+        , dr  = sum(cross$tabs > h_disc)/N
+        , simi = simi
+        , pari = pari
+      ) %>% 
+      select(pari, simi, everything())
     
-    # q = 0.75
-    # q_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% quantile()
-    # lambda = (med_tabs_good - tgoodhat)/log(1/(1-q))
+    # extrapolate and estimate fdrmax
+    temp.exp = est_trunc_gamma(pubcross$tabs, tgoodhat, 1) %>% as_tibble()
+    temp.alt = est_trunc_gamma(pubcross$tabs, tgoodhat, 0.5) %>% as_tibble()
+    fit = rbind(temp.exp, temp.alt) %>% 
+      mutate(
+        h_disc = h_disc
+        , dr_hat = 1-pgamma(h_disc, shape = shape, scale = scale)
+        , fdrmax = fdrhat_numer/dr_hat
+      ) %>% 
+      mutate(simi = simi, pari = pari) %>% 
+      select(pari, simi, everything())
     
-    
-    # = find fdr (true and estimated) = #
-    famstat = cross %>% 
-      filter( tabs > h_disc ) %>% 
-      summarize(
-        fdp = mean(!verity)
-        , share_disc_actual = n()/N
-        , share_disc = exp(-1/lambda*h_disc)
-        , fdrhat = fdrhat_numer/share_disc
-        , bounded = fdrhat >= fdp
-        , npub = dim(pubcross)[1]
-      )
-    
+    # store
+    truthlist = rbind(truthlist, truth)
+    estlist = rbind(estlist, fit)
 
-    # save and feedback
-    fdrlist = rbind(fdrlist, cbind(par, famstat) )
-    
   } # for pari
-  
-  # save to disk ====
-  # I guess eventually we may want 1e3 sims or whatever
-  fdrlist = fdrlist %>% 
-    mutate(simi = simi) %>% 
-    select(simi, everything())
-  
-  write_csv(
-    fdrlist
-    , paste0('../results/sim-extrap-pub/fdrlist-sim', sprintf('%04d', simi), '.csv')
-  )
   
   toc = Sys.time()
   print(toc - tic)
-  print(fdrlist)
-  
+
 } # for simi
 
 
 # TABLE: BOUND CHECK ====
 
-## compile sims ====
-csvlist = dir('../results/sim-extrap-pub/', full.names = T)
-
-simdat = tibble()
-for (csvname in csvlist){
-  temp = fread(csvname)
-  simdat = rbind(simdat, temp)
-} # for i 
-
-
-pardat = simdat %>% 
-  group_by(pF, mutrue, tgood) %>% 
+temp = truthlist %>% 
+  group_by(pari) %>% 
   summarize(
     fdr = mean(fdp)
-  ) 
+  )
 
-simdat = simdat %>% 
+# merge all sim data
+simdat = estlist %>% 
   left_join(
-    pardat, by = c('pF','mutrue', 'tgood')
+    truthlist, by = c('pari','simi','h_disc')
+  ) %>% 
+  left_join(
+    temp, by = 'pari'
   )
 
 
+## test
+simdat %>% 
+  filter(shape == 0.5) %>% 
+  mutate(bounded = fdrmax >= fdr) %>% 
+  group_by(pari, pF, mutrue) %>% 
+  summarize(
+    fdrmax= mean(fdrmax), fdr = mean(fdr), boundrate = mean(bounded)
+  ) %>% 
+  print(n=50)
+  
+  
 ## table for output ====
 tabout = simdat %>% 
-  group_by(pF, mutrue, tgood) %>%
-  mutate(
-    denom = fdr
-  ) %>% 
+  group_by(tgood, pF, mutrue, shape) %>%
   summarize(
-    x1_fdract = mean(fdp)*100
-    , x2_fdrhat = mean(fdrhat)*100
-    , x2b_ave = mean(fdrhat/denom)
-    , x3_sd = -sd(fdrhat/denom)
-    , x4_pctok = mean(fdrhat>denom)*100
-    , x5_npub = mean(npub)
+    x1_fdr = mean(fdr)*100
+    , x2_fdrmax   = mean(fdrmax)*100
+    , x3_ratio    = mean(fdrmax/fdr)
+    , x3b_ratio_med    = median(fdrmax/fdr)    
+    , x3c_ratio_sd = -sd(fdrmax/fdr)
+    , x4_pctok    = mean(fdrmax>fdr)*100
+    , x5_npub     = mean(npub)
   ) %>% 
   mutate_all(round, 2) %>% 
   pivot_longer(
@@ -354,26 +352,38 @@ tabout = simdat %>%
     names_from = pF, names_prefix = 'pF_', values_from = 'value'
   ) %>% 
   arrange(
-    -mutrue, tgood, stat
+    tgood, -shape, -mutrue, stat, 
   )
 
 
-write_csv(tabout, '../results/tab-sim-extrap-pub.csv')
+write_csv(tabout, '../results/tab-sim-extrap.csv')
 
-tabout %>% 
-  as.data.frame()
 
-tabout %>% 
+tabsmall = tabout %>% 
   filter(
-    grepl('_fdract', stat)
-  )
+    stat %in% c('x1_fdr', 'x3_ratio', 'x4_pctok'), tgood == 2.6, mutrue <= 0.5
+  ) %>% 
+  arrange(
+    tgood, -shape,  -mutrue, stat
+  ) %>% 
+  print(n = 50)
+
+write_csv(tabsmall, '../results/tab-sim-extrap-small.csv')  
 
 
-tabout %>% 
+tabsmall2 = tabout %>% 
   filter(
-    grepl('_ave', stat)
-  )
+    stat %in% c('x1_fdr', 'x3_ratio', 'x4_pctok'), tgood == 2.6, mutrue <= 0.5
+  ) %>% 
+  arrange(
+    tgood, -shape,  -mutrue, stat
+  ) %>% 
+  print(n = 50)
 
+write_csv(tabsmall2, '../results/tab-sim-extrap-small-app.csv')  
+
+
+# ====
 
 # simplest chart
 tabout %>% 
@@ -381,82 +391,46 @@ tabout %>%
     grepl('pctok', stat)
   )
 
-tabout %>% 
-  filter(stat != 'x5_npub', stat != 'x2_fdrhat') %>% 
-  as.data.frame() %>% 
-    arrange(tgood, -mutrue, stat)
-
 
 # MANUALLY INSPECT ====
 
 set.seed(934)
 
-# settings
+## settings ====
 tgoodhat = 2
 
 # par = data.frame(pF = 0.8, mutrue = 0.25, tgood = 2.6, tbad = 1.96, smarg = 0.5)
-par = data.frame(pF = 0.8, mutrue = 0.75, tgood = 2.6, tbad = 1.96, smarg = 0.5)
+par = data.frame(pF = 0.9, mutrue = 0.75, tgood = 2.6, tbad = 1.96, smarg = 0.5)
 
+shape = 0.5
 
 ## sim ====
 
 
-# sim noise 
-signalselect = sample(1:dim(emat)[2], N, replace = T)
-dateselect = sample(1:dim(emat)[1], ndate, replace = T)
-eboot = weight_emp* emat[dateselect, signalselect] + 
-  (1-weight_emp)*matrix(rnorm(N*ndate, 0, vol_noise), nrow = ndate)
+# simulate noise (reuse for each par)
+cross0 = sim_noise(emat, N, ndate, weight_emp, vol_noise)
 
-cross0 = tibble(
-  signalid = 1:N
-  , ebar = apply(eboot, 2, mean, na.rm=T)
-  , vol  = apply(eboot, 2, sd, na.rm=T)
-  , ndate  = apply(eboot, 2, function(x) sum(!is.na(x)))
-)
-
-# simulate mu, rbar, tstat
-cross = cross0 %>% 
-  mutate(
-    signalid = 1:N
-    , verity = runif(N) > par$pF
-    , mu = verity*par$mutrue + (1-verity)*0
-  ) %>% 
-  mutate(
-    rbar = mu + ebar, tstat = rbar/vol*sqrt(ndate), tabs = abs(tstat)
-  ) %>% 
-  # sim publication
-  mutate(
-    u = runif(N)
-    , pub = case_when(
-      tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
-      , tabs > par$tgood ~ T
-      , T ~ F # otherwise false
-    )
-  )
+# simulate mu and add to noise to make rbar, tstat 
+cross = sim_other_stuff(cross0, N, par)
 pubcross = cross %>% filter(pub)
 
 # estimate 
-mean_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% mean()
-
-
-lambda = mean_tabs_good - tgoodhat
-
-shape_alt = 0.5
-est = est_trunc_gamma(pubcross$tabs, tgoodhat, shape = shape_alt)
-lambda_alt = est$shape
+fit = est_trunc_gamma(pubcross$tabs, tgoodhat, shape = shape) %>% 
+  mutate(
+    h_disc = h_disc
+    , dr_hat = 1-pgamma(h_disc, shape = shape, scale = scale)
+    , fdrmax = fdrhat_numer/dr_hat
+  ) 
 
 stat.fdr = cross %>% 
   filter( tabs > h_disc ) %>% 
   summarize(
     h_disc = h_disc            
     , fdp = mean(!verity)
-    , share_disc = n()/N
-    , share_disc_hat = exp(-1/lambda*h_disc)
-    , share_disc_alt = 1-pgamma(h_disc, shape = shape_alt, scale = lambda_alt)
-    , fdrhat = fdrhat_numer/share_disc_hat
-    , fdrhatalt = fdrhat_numer/share_disc_alt
-    , bounded = fdrhat >= fdp
-    , npub = dim(pubcross)[1]
+    , dr = n()/N
+  ) %>% 
+  cbind(
+    fit
   )
 
 stat.fdr
@@ -468,8 +442,7 @@ edge = seq(0,10,0.2)
 tabs_match = 3
 
 edge_fit = seq(0,10,0.1)
-F_fit = function(tabs) pexp(tabs, rate = 1/lambda)
-# F_fit = function(tabs) pgamma(tabs, shape = shape_alt, rate = 1/lambda_alt)
+F_fit = function(tabs) pgamma(tabs, shape = fit$shape, scale = fit$scale)
 
 match_fac = sum(cross$tabs > tabs_match) / (1-F_fit(tabs_match)) *
       diff(edge)[1] /diff(edge_fit)[1]

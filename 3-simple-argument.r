@@ -54,7 +54,7 @@ theme_set(
 
 
 
-# NON-PARAMETRIC ====
+# THEORY-FREE ====
 
 # fdr calculations
 F_yz = ecdf(yz_sum$tabs)
@@ -107,20 +107,27 @@ ggsave('../results/yz-intuition.pdf', scale = 1, height = 2.5, width = 5, device
 
 
 
-# Extrap ====
+# CONS EXTRAP ====
 
 # fdr calculations
-mean_all = 2.0 # 2.0 is just easier
-Pr_disc = exp(-1/mean_all*tabs_cut)
-# Pr_disc_F = 2*(1-pnorm(tabs_cut))
-Pr_disc_F = 0.05
+Pr_disc_F = 0.05 # hand calc is easier
+
+# fit by mom
+fit = est_trunc_gamma(cz_sum$tabs, tgood = 2, shape = 1)
+
+# hand calc: just assumes shape = 1, scale = 2
+fit = list(shape = 1, scale = 2)
+F_fit = function(tabs) pgamma(tabs, shape = fit$shape, scale = fit$scale)
+Pr_disc = 1-F_fit(tabs_cut)
+
+
 fdrmax = Pr_disc_F/Pr_disc
 
 # make data for plotting
 F_cz = ecdf(cz_sum$tabs)
 n_cz = length(cz_sum$tabs)
 edge_cz = seq(0,10,0.5)
-F_fit = function(tabs) pexp(tabs, rate = 1/mean_all)
+
 
 edge_fit = seq(0,10,0.1)
 plotme = make_dist_dat(
