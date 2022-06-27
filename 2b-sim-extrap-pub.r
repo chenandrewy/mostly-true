@@ -6,6 +6,40 @@ source('0-functions.r')
 
 load('../data/emp_data.Rdata')
 
+
+# creates data for comparing cdf F1 to cdf F2 in a plot
+make_dist_dat = function(F1, edge1, F2, edge2, x_match = c(-Inf,Inf), N1 = 1, showplot = F){
+  
+  rescale_fac = diff(F1(x_match))/diff(F2(x_match)) * diff(edge1)[1] /diff(edge2)[1]
+  
+  dat = tibble(
+    edge = edge1, F = F1(edge1), group = 1
+  ) %>% 
+    rbind(
+      tibble(
+        edge = edge2, F = F2(edge2)*rescale_fac, group = 2
+      )
+    ) %>% 
+    group_by(group) %>% 
+    mutate(
+      F = N1*F
+      , dF = F - lag(F)
+      , mids = 0.5*(edge + lag(edge))
+      , group = factor(group, levels = c(1,2))
+    ) %>% 
+    filter(!is.na(dF))
+  
+  if (showplot) {
+    dat %>% 
+      ggplot(aes(x=edge, y=dF)) +
+      geom_line(aes(color = group))
+  }
+  
+  return(dat)
+  
+} # make_dist_dat
+
+
 ## settings ====
 
 # data cleaning 
@@ -21,7 +55,7 @@ vol_noise = mean(cz_sum$vol)
 
 # parameters
 pF_list     = c(seq(0.5, 0.9, 0.1), 0.95, 0.99)
-mutrue_list = c(0.5, 0.25)
+mutrue_list = c(0.25, 0.5, 0.75)
 # mutrue_list = seq(0.1, 0.5, 0.1)
 tgood_list = c(2.6, 5.0)
 
@@ -206,9 +240,9 @@ for (simi in 1:nsim){
       mutate(
         u = runif(N)
         , pub = case_when(
-          tabs <= par$tbad ~ F
-          , tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
+          tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
           , tabs > par$tgood ~ T
+          , T ~ F # otherwise false
         )
       )
     
@@ -329,6 +363,7 @@ tabout %>%
   )
 
 
+# simplest chart
 tabout %>% 
   filter(
     grepl('pctok', stat)
@@ -340,18 +375,21 @@ tabout %>%
     arrange(tgood, -mutrue, stat)
 
 
-# TEST ====
+# MANUALLY INSPECT ====
 
 set.seed(934)
 
 tgoodhat = 2
 
 par = data.frame(
-  pF = 0.95, mutrue = 0.75, tgood = 2.6, tbad = 1.96, smarg = 0.5
+  pF = 0.80, mutrue = 0.75, tgood = 2.6, tbad = 1.96, smarg = 0.5
 )
 
 
-# sim noise ===
+## sim ====
+
+
+# sim noise 
 signalselect = sample(1:dim(emat)[2], N, replace = T)
 dateselect = sample(1:dim(emat)[1], ndate, replace = T)
 eboot = weight_emp* emat[dateselect, signalselect] + 
@@ -378,27 +416,18 @@ cross = cross0 %>%
   mutate(
     u = runif(N)
     , pub = case_when(
-      tabs <= par$tbad ~ F
-      , tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
+      tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
       , tabs > par$tgood ~ T
+      , T ~ F # otherwise false
     )
   )
-
 pubcross = cross %>% filter(pub)
 
-
-quantile(pubcross %>% filter(tabs>tgoodhat) %>% pull(tabs))
-
-
+# estimate 
 mean_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% mean()
-
-q = 0.75
-q_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% quantile(q)
-
 lambda = mean_tabs_good - tgoodhat
-lambda_med = (q_tabs_good - tgoodhat)/log(1/(1-q))
 
-cross %>% 
+stat.fdr = cross %>% 
   filter( tabs > h_disc ) %>% 
   summarize(
     fdp = mean(!verity)
@@ -410,6 +439,57 @@ cross %>%
     , fdrhat_alt =fdrhat_numer / exp(-1/lambda_med*h_disc)
     , b_alt = fdrhat_alt >= fdp
   )
+
+stat.fdr
+
+## plot ====
+
+
+# make data for plotting
+F_cz = ecdf(pubcross$tabs)
+n_cz = length(pubcross$tabs)
+edge = seq(0,10,0.5)
+F_fit = function(tabs) pexp(tabs, rate = 1/lambda)
+
+F_cz = ecdf(cross$tabs)
+
+edge_fit = seq(0,10,0.1)
+plotme = make_dist_dat(
+  F_cz, edge, F_fit, edge_fit, x_match = c(3.0,Inf), N1 = n_cz, showplot = T
+)
+
+
+sum(is.na(cross$pub))
+
+# plot
+ggplot(data = plotme, aes(x=mids, y=dF)) +
+  geom_bar(
+    data = plotme %>% filter(group == 1)
+    , stat = 'identity', position = 'identity'
+    , aes(fill = group)
+  ) +
+  scale_fill_manual(
+    values = 'gray', labels = 'Published', name = NULL
+  ) +  
+  geom_line(
+    data = plotme %>% filter(group == 2), aes(color = group)
+  ) +
+  scale_color_manual(
+    values = MATBLUE, labels = 'Extrapolated', name = NULL
+  )
+
+## old ====
+
+quantile(pubcross %>% filter(tabs>tgoodhat) %>% pull(tabs))
+
+
+mean_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% mean()
+
+q = 0.75
+q_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% quantile(q)
+
+lambda = mean_tabs_good - tgoodhat
+lambda_med = (q_tabs_good - tgoodhat)/log(1/(1-q))
 
 
 

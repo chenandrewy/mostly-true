@@ -107,7 +107,7 @@ ggsave('../results/yz-intuition.pdf', scale = 1, height = 2.5, width = 5, device
 
 
 
-# SEMI-PARAMETRIC ====
+# Extrap ====
 
 # fdr calculations
 mean_all = 2.0 # 2.0 is just easier
