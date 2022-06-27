@@ -6,6 +6,50 @@ source('0-functions.r')
 
 load('../data/emp_data.Rdata')
 
+# bootstraps residual effects om crpss=sectopm
+sim_noise = function(emat, N, ndate, weight_emp, vol_noise){
+  
+  signalselect = sample(1:dim(emat)[2], N, replace = T)
+  dateselect = sample(1:dim(emat)[1], ndate, replace = T)
+  eboot = weight_emp* emat[dateselect, signalselect] + 
+    (1-weight_emp)*matrix(rnorm(N*ndate, 0, vol_noise), nrow = ndate)
+  
+  cross0 = tibble(
+    signalid = 1:N
+    , ebar = apply(eboot, 2, mean, na.rm=T)
+    , vol  = apply(eboot, 2, sd, na.rm=T)
+    , ndate  = apply(eboot, 2, function(x) sum(!is.na(x)))
+  )
+  
+  return = cross0
+  
+} # end sim noise
+
+# turns residuals into a cross section 
+sim_other_stuff = function(cross0, N, par){
+  
+  cross = cross0 %>% 
+    mutate(
+      signalid = 1:N
+      , verity = runif(N) > par$pF
+      , mu = verity*par$mutrue + (1-verity)*0
+    ) %>% 
+    mutate(
+      rbar = mu + ebar, tstat = rbar/vol*sqrt(ndate), tabs = abs(tstat)
+    ) %>% 
+    # sim publication
+    mutate(
+      u = runif(N)
+      , pub = case_when(
+        tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
+        , tabs > par$tgood ~ T
+        , T ~ F # otherwise false
+      )
+    )
+  
+  return = cross
+  
+} # end sim_other_stuff
 
 # creates data for comparing cdf F1 to cdf F2 in a plot
 make_dist_dat = function(F1, edge1, F2, edge2, x_match = c(-Inf,Inf), N1 = 1, showplot = F){
@@ -83,7 +127,7 @@ fdrhat_numer = 0.05
 tgoodhat = 2.6
 
 
-# PREP RESIDUALS  ====
+## Prep Residuals  ====
 monthsum = cz_ret %>%
   group_by(date) %>%
   summarize(nsignal = sum(!is.na(ret)))
@@ -205,47 +249,18 @@ for (simi in 1:nsim){
     paste0('sim-extrap-pub: simi = ', simi, ' nsim = ', nsim)
   )
   
-  ## sim noise ====
-  signalselect = sample(1:dim(emat)[2], N, replace = T)
-  dateselect = sample(1:dim(emat)[1], ndate, replace = T)
-  eboot = weight_emp* emat[dateselect, signalselect] + 
-    (1-weight_emp)*matrix(rnorm(N*ndate, 0, vol_noise), nrow = ndate)
+  # simulate noise (reuse for each par)
+  cross0 = sim_noise(emat, N, ndate, weight_emp, vol_noise)
   
-  cross0 = tibble(
-    signalid = 1:N
-    , ebar = apply(eboot, 2, mean, na.rm=T)
-    , vol  = apply(eboot, 2, sd, na.rm=T)
-    , ndate  = apply(eboot, 2, function(x) sum(!is.na(x)))
-  )
-  
-  # sim cross ====
+  # loop over different par in parlist
   fdrlist = tibble()
-  
   for (pari in 1:dim(parlist)[1]){
     
     # load par
     par = parlist[pari,]
     
-    # simulate mu, rbar, tstat
-    cross = cross0 %>% 
-      mutate(
-        signalid = 1:N
-        , verity = runif(N) > par$pF
-        , mu = verity*par$mutrue + (1-verity)*0
-      ) %>% 
-      mutate(
-        rbar = mu + ebar, tstat = rbar/vol*sqrt(ndate), tabs = abs(tstat)
-      ) %>% 
-      # sim publication
-      mutate(
-        u = runif(N)
-        , pub = case_when(
-          tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
-          , tabs > par$tgood ~ T
-          , T ~ F # otherwise false
-        )
-      )
-    
+    # simulate mu and add to noise to make rbar, tstat 
+    cross = sim_other_stuff(cross0, N, par)
     pubcross = cross %>% filter(pub)
     
     # estimate lambda
@@ -276,18 +291,15 @@ for (simi in 1:nsim){
   } # for pari
   
   # save to disk ====
-  
+  # I guess eventually we may want 1e3 sims or whatever
   fdrlist = fdrlist %>% 
     mutate(simi = simi) %>% 
     select(simi, everything())
-  
-  
   
   write_csv(
     fdrlist
     , paste0('../results/sim-extrap-pub/fdrlist-sim', sprintf('%04d', simi), '.csv')
   )
-  
   
   toc = Sys.time()
   print(toc - tic)
@@ -382,9 +394,8 @@ set.seed(934)
 # settings
 tgoodhat = 2
 
-par = data.frame(
-  pF = 0.8, mutrue = 0.25, tgood = 2.6, tbad = 1.96, smarg = 0.5
-)
+# par = data.frame(pF = 0.8, mutrue = 0.25, tgood = 2.6, tbad = 1.96, smarg = 0.5)
+par = data.frame(pF = 0.8, mutrue = 0.75, tgood = 2.6, tbad = 1.96, smarg = 0.5)
 
 
 ## sim ====
@@ -426,22 +437,29 @@ pubcross = cross %>% filter(pub)
 
 # estimate 
 mean_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% mean()
+
+
 lambda = mean_tabs_good - tgoodhat
+
+shape_alt = 0.5
+est = est_trunc_gamma(pubcross$tabs, tgoodhat, shape = shape_alt)
+lambda_alt = est$shape
 
 stat.fdr = cross %>% 
   filter( tabs > h_disc ) %>% 
   summarize(
-    fdp = mean(!verity)
-    , share_disc_actual = n()/N
-    , share_disc = exp(-1/lambda*h_disc)
-    , fdrhat = fdrhat_numer/share_disc
+    h_disc = h_disc            
+    , fdp = mean(!verity)
+    , share_disc = n()/N
+    , share_disc_hat = exp(-1/lambda*h_disc)
+    , share_disc_alt = 1-pgamma(h_disc, shape = shape_alt, scale = lambda_alt)
+    , fdrhat = fdrhat_numer/share_disc_hat
+    , fdrhatalt = fdrhat_numer/share_disc_alt
     , bounded = fdrhat >= fdp
     , npub = dim(pubcross)[1]
-    , fdrhat_alt =fdrhat_numer / exp(-1/lambda_med*h_disc)
-    , b_alt = fdrhat_alt >= fdp
   )
 
-
+stat.fdr
 
 ## plot ====
 
@@ -451,6 +469,7 @@ tabs_match = 3
 
 edge_fit = seq(0,10,0.1)
 F_fit = function(tabs) pexp(tabs, rate = 1/lambda)
+# F_fit = function(tabs) pgamma(tabs, shape = shape_alt, rate = 1/lambda_alt)
 
 match_fac = sum(cross$tabs > tabs_match) / (1-F_fit(tabs_match)) *
       diff(edge)[1] /diff(edge_fit)[1]
@@ -510,79 +529,4 @@ grid.arrange(p1,p2,p3, nrow = 1)
 
 # show stats to console
 stat.fdr
-
-# old ====
-
-
-
-F_cz = ecdf(cross$tabs)
-
-rescale_fac = diff(F1(x_match))/diff(F2(x_match)) * diff(edge1)[1] /diff(edge2)[1]
-
-dat = tibble(
-  edge = edge1, F = F1(edge1), group = 1
-) %>% 
-  rbind(
-    tibble(
-      edge = edge2, F = F2(edge2)*rescale_fac, group = 2
-    )
-  ) %>% 
-  group_by(group) %>% 
-  mutate(
-    F = N1*F
-    , dF = F - lag(F)
-    , mids = 0.5*(edge + lag(edge))
-    , group = factor(group, levels = c(1,2))
-  ) %>% 
-  filter(!is.na(dF))
-
-
-
-plotme = make_dist_dat(
-  F_cz, edge, F_fit, edge_fit, x_match = c(3.0,Inf), N1 = n_cz, showplot = T
-)
-
-
-
-
-
-sum(is.na(cross$pub))
-
-# plot
-ggplot(data = plotme, aes(x=mids, y=dF)) +
-  geom_bar(
-    data = plotme %>% filter(group == 1)
-    , stat = 'identity', position = 'identity'
-    , aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = 'gray', labels = 'Published', name = NULL
-  ) +  
-  geom_line(
-    data = plotme %>% filter(group == 2), aes(color = group)
-  ) +
-  scale_color_manual(
-    values = MATBLUE, labels = 'Extrapolated', name = NULL
-  )
-
-# old ====
-
-quantile(pubcross %>% filter(tabs>tgoodhat) %>% pull(tabs))
-
-
-mean_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% mean()
-
-q = 0.75
-q_tabs_good = pubcross %>% filter(tabs > tgoodhat) %>% pull(tabs) %>% quantile(q)
-
-lambda = mean_tabs_good - tgoodhat
-lambda_med = (q_tabs_good - tgoodhat)/log(1/(1-q))
-
-
-
-
-hist(pubcross$tabs)
-hist(pubcross %>% filter(tabs>tgoodhat) %>% pull(tabs))
-hist(cross %>%  pull(tabs), breaks = 50)
-
 
