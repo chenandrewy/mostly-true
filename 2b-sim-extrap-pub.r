@@ -93,13 +93,13 @@ min_nsignal = 100
 # dimensions
 N = 1e4
 ndate = 200
-nsim = 20
+nsim = 1000
 weight_emp = 0.9
 vol_noise = mean(cz_sum$vol)
 
 # parameters
 pF_list     = c(seq(0.5, 0.9, 0.1), 0.95, 0.99)
-mutrue_list = c(0.25, 0.5, 0.75)
+mutrue_list = c(0.25, 0.375, 0.5, 0.75)
 # mutrue_list = seq(0.1, 0.5, 0.1)
 tgood_list = c(2.6, 5.0)
 
@@ -122,12 +122,9 @@ parlist = parlist %>%
 set.seed(1120)
 
 # fdr estimation
-# h_disc = 2.6 # cutoff for a discovery
-# fdrhat_numer = 2*pt(-h_disc, 100) # plug in this for Pr(F|disc)
-
 h_disc = 2.0 # cutoff for a discovery
 fdrhat_numer = 0.05
-tgoodhat = 2.0 # now has to be the same as h_disc
+tgoodhat = 2.6 # 
 
 
 ## Prep Residuals  ====
@@ -320,28 +317,21 @@ simdat = estlist %>%
     temp, by = 'pari'
   )
 
-
-## test
-simdat %>% 
-  filter(shape == 0.5) %>% 
-  mutate(bounded = fdrmax >= fdr) %>% 
-  group_by(pari, pF, mutrue) %>% 
-  summarize(
-    fdrmax= mean(fdrmax), fdr = mean(fdr), boundrate = mean(bounded)
-  ) %>% 
-  print(n=50)
-  
   
 ## table for output ====
 tabout = simdat %>% 
+  # drop sims with not enough pubs
+  filter(npub > 50) %>% 
+  # force fdr max <= 1 for ease of interpretation
+  mutate(fdrmax = pmin(fdrmax,1)) %>% 
   group_by(tgood, pF, mutrue, shape) %>%
   summarize(
-    x1_fdr = mean(fdr)*100
+    x1_fdr = min(fdr)*100
     , x2_fdrmax   = mean(fdrmax)*100
     , x3_ratio    = mean(fdrmax/fdr)
     , x3b_ratio_med    = median(fdrmax/fdr)    
     , x3c_ratio_sd = -sd(fdrmax/fdr)
-    , x4_pctok    = mean(fdrmax>fdr)*100
+    , x4_pctok    = mean(fdrmax>=fdr)*100
     , x5_npub     = mean(npub)
   ) %>% 
   mutate_all(round, 2) %>% 
@@ -356,69 +346,75 @@ tabout = simdat %>%
   )
 
 
-write_csv(tabout, '../results/tab-sim-extrap.csv')
-
-
 tabsmall = tabout %>% 
   filter(
     stat %in% c('x1_fdr', 'x3_ratio', 'x4_pctok'), tgood == 2.6, mutrue <= 0.5
   ) %>% 
   arrange(
-    tgood, -shape,  -mutrue, stat
+    tgood, -mutrue,  -shape, stat
   ) %>% 
   print(n = 50)
 
-write_csv(tabsmall, '../results/tab-sim-extrap-small.csv')  
+write_csv(tabsmall, '../results/tab-sim-extrap-bench.csv')  
 
 
 tabsmall2 = tabout %>% 
   filter(
-    stat %in% c('x1_fdr', 'x3_ratio', 'x4_pctok'), tgood == 2.6, mutrue <= 0.5
+    stat %in% c('x1_fdr', 'x3_ratio', 'x4_pctok'), tgood == 5, mutrue <= 0.5
   ) %>% 
   arrange(
-    tgood, -shape,  -mutrue, stat
+    tgood, -mutrue,  -shape, stat
   ) %>% 
   print(n = 50)
 
-write_csv(tabsmall2, '../results/tab-sim-extrap-small-app.csv')  
-
-
-# ====
-
-# simplest chart
-tabout %>% 
-  filter(
-    grepl('pctok', stat)
-  )
-
+write_csv(tabsmall2, '../results/tab-sim-extrap-alt.csv')  
 
 # MANUALLY INSPECT ====
 
-set.seed(934)
+# set.seed(934)
 
 ## settings ====
-tgoodhat = 2
+tgoodhat = 2.6
 
 # par = data.frame(pF = 0.8, mutrue = 0.25, tgood = 2.6, tbad = 1.96, smarg = 0.5)
-par = data.frame(pF = 0.9, mutrue = 0.75, tgood = 2.6, tbad = 1.96, smarg = 0.5)
+par = data.frame(pF = 0.9, mutrue = 0.4, tgood = 2.6, tbad = 1.96, smarg = 0.5)
 
 shape = 0.5
 
-## sim ====
-
-
+## sim ===
 # simulate noise (reuse for each par)
 cross0 = sim_noise(emat, N, ndate, weight_emp, vol_noise)
 
 # simulate mu and add to noise to make rbar, tstat 
-cross = sim_other_stuff(cross0, N, par)
+# cross = sim_other_stuff(cross0, N, par)
+# temptrue = rexp(N, rate = 1/par$mutrue)
+temptrue = par$mutrue
+cross = cross0 %>% 
+  mutate(
+    signalid = 1:N
+    , verity = runif(N) > par$pF
+    , mu = verity*temptrue + (1-verity)*0
+  ) %>% 
+  mutate(
+    rbar = mu + ebar, tstat = rbar/vol*sqrt(ndate), tabs = abs(tstat)
+  ) %>% 
+  # sim publication
+  mutate(
+    u = runif(N)
+    , pub = case_when(
+      tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
+      , tabs > par$tgood ~ T
+      , T ~ F # otherwise false
+    )
+  )
+
+
 pubcross = cross %>% filter(pub)
 
 # estimate 
 fit = est_trunc_gamma(pubcross$tabs, tgoodhat, shape = shape) %>% 
   mutate(
-    h_disc = h_disc
-    , dr_hat = 1-pgamma(h_disc, shape = shape, scale = scale)
+    dr_hat = 1-pgamma(h_disc, shape = shape, scale = scale)
     , fdrmax = fdrhat_numer/dr_hat
   ) 
 
@@ -491,8 +487,8 @@ p3 = ggplot(pubcross, aes(x=tabs, group = verity)) +
   coord_cartesian(xlim = xlimnum) +
   ylab('count, pub only')
 
-if (F){
-  ylimmax = 2200
+if (T){
+  ylimmax = 500
   p1 = p1 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
   p2 = p2 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
   p3 = p3 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
@@ -503,3 +499,8 @@ grid.arrange(p1,p2,p3, nrow = 1)
 # show stats to console
 stat.fdr
 
+
+
+# extra check ====
+ggplot(pubcross, aes(x=tabs, group = verity)) +
+  geom_histogram(aes(fill = verity), breaks = edge, position = 'stack')

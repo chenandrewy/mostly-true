@@ -6,7 +6,7 @@ source('0-functions.r')
 
 load('../data/emp_data.Rdata')
 
-## settings ====
+## User Settings ====
 
 # data cleaning 
 min_nmonth = 200
@@ -14,10 +14,10 @@ min_nsignal = 100
 
 # dimensions
 ndate = 500
-nsim = 100
+nsim = 1000
 
 # parameters
-pF_list     = c(0.25, 0.5, 0.75, 0.9, 0.95, 0.99)
+pF_list     = c(seq(0.5, 0.9, 0.1), 0.95, 0.99)
 mutrue_list = c(0.25, 0.5, 0.75)
 
 parlist = expand_grid(pF = pF_list, mutrue = mutrue_list)
@@ -145,6 +145,8 @@ ggsave(
 
 # SIMULATE MANY TIMES ====
 
+simdat = tibble()
+
 for (simi in 1:nsim){
   tic = Sys.time()
   
@@ -186,73 +188,45 @@ for (simi in 1:nsim){
     famstat = cross %>% 
       filter( tabs > h_disc ) %>% 
       summarize(
-        fdp = mean(!verity), share_disc = n()/N, fdrhat = fdrhat_numer/share_disc
-        , bounded = fdrhat >= fdp
-      )
+        fdp = mean(!verity), dr = n()/N, fdrmax = fdrhat_numer/dr
+      ) 
     
+    # save 
+    temp = cbind(par, famstat) %>% mutate(pari = pari, simi = simi) %>% 
+      select(pari, simi, everything())
     
-    # save and feedback
-    fdrlist = rbind(fdrlist, cbind(par, famstat) )
+    simdat = rbind(simdat, temp)
     
   } # for pari
-  
-  # save to disk ====
-  
-  fdrlist = fdrlist %>% 
-    mutate(simi = simi) %>% 
-    select(simi, everything())
-  
-  
-  
-  write_csv(
-    fdrlist
-    , paste0('../results/sim-theory-free/fdrlist-sim', sprintf('%04d', simi), '.csv')
-  )
-  
-  
+
   toc = Sys.time()
   print(toc - tic)
-  print(fdrlist)
   
 } # for simi
 
 
-
-
-
-# TABLE: BOUND CHECK ====
-
-## compile sims ====
-csvlist = dir('../results/sim-theory-free/', full.names = T)
-
-simdat = tibble()
-for (csvname in csvlist){
-  temp = fread(csvname)
-  simdat = rbind(simdat, temp)
-} # for i 
-
-
-pardat = simdat %>% 
-  group_by(pF, mutrue) %>% 
+# calculate fdr
+temp = simdat %>% 
+  group_by(pari) %>% 
   summarize(
     fdr = mean(fdp)
-  ) 
+  )
 
 simdat = simdat %>% 
   left_join(
-    pardat, by = c('pF','mutrue')
+    temp, by = 'pari'
   )
+
+# TABLE: BOUND CHECK ====
 
 
 ## table for output ====
 tabout = simdat %>% 
   group_by(pF, mutrue) %>%
-  mutate(denom = fdr) %>% 
   summarize(
-    x1_fdr = mean(fdp)*100
-    , x2_ave = mean(fdrhat/denom)
-    , x3_sd = -sd(fdrhat/denom)
-    , x4_pct_ok =-mean(fdrhat > denom) *100
+    x1_fdr = mean(fdr)*100
+    , x2_ave = mean(fdrmax/fdr)
+    , x4_pct_ok =mean(fdrmax > fdr) *100
   ) %>% 
   pivot_longer(
     cols = starts_with('x'), names_to = 'stat', values_to = 'value'
