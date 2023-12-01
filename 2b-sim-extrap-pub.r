@@ -1,5 +1,7 @@
 # 2022 05 10: simulation for cz data 
 
+# takes about 10 minutes
+
 # SETUP ====
 rm(list=ls())
 source('0-functions.r')
@@ -150,7 +152,7 @@ resid = cz_ret %>%
 
 emat = resid %>% 
   pivot_wider(
-    id_cols = c(signalname,date,e)
+    id_cols = c(date)
     , names_from = signalname
     , values_from = e
   ) %>% 

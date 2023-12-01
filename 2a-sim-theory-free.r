@@ -53,7 +53,7 @@ resid = yz_ret %>%
 
 emat = resid %>% 
   pivot_wider(
-    id_cols = c(signalname,date,e)
+    id_cols = c(date)
     , names_from = signalname
     , values_from = e
     ) %>% 
