@@ -6,17 +6,7 @@
 
 rm(list = ls())
 source('0-functions.r')
-detach_all()
-library(tidyverse)
-library(data.table)
 library(googledrive)
-library(readxl)
-library(RColorBrewer)
-library(lubridate)
-library(boot)
-library(e1071)
-library(truncdist)
-library(gridExtra)
 
 ### USER ENTRY
 # root of March 2022 release on Gdrive
@@ -26,11 +16,6 @@ pathRelease = 'https://drive.google.com/drive/folders/1O18scg9iBTiBaDiQFhoGxdn4F
 # login to gdrive
 # this prompts a login
 pathRelease %>% drive_ls()
-
-# parameters for balanced panel
-min_nmonth = 200
-min_nsignal = 150
-
 
 # DOWNLOAD DATA =====
 
@@ -86,6 +71,37 @@ cz_sum = cz_ret %>%
   )
 
 
+# ADD CLZ DATA ====
+# created 2023 12 
+# this can replace the yz data
+
+# copy-paste from browser via Chen's website
+url_clz = 'https://drive.google.com/drive/folders/16RqeHNyU5gcqjRUvqSeOfQCxu_B2mfcZ'
+
+target_dribble = url_clz %>% drive_ls() %>% 
+  filter(name=='DataMinedLongShortReturnsEW.csv')
+
+drive_download(target_dribble, path = '../data/CLZ_raw.csv', overwrite = T)
+
+# clean up
+temp0 = fread('../data/CLZ_raw.csv') 
+
+clz_ret = temp0 %>% 
+  mutate(date = paste(year, month, '28', sep = '-')
+      , date = as.Date(date, format = '%Y-%m-%d')) %>% 
+  transmute(signalname = signalid, date, ret)
+
+# repeatedly used summary stats (in-sample)
+clz_sum = clz_ret %>% 
+  group_by(signalname) %>% 
+  summarize(
+    rbar = mean(ret)
+    , vol = sd(ret)
+    , nmonth = n()
+    , traw = rbar/vol*sqrt(nmonth)
+    , tabs = abs(traw)
+  )
+
 
 # ADD YZ DATA ====
 # created 2022 04 to read yz data
@@ -95,6 +111,7 @@ cz_sum = cz_ret %>%
 library(haven) # for read_sas
 
 temp = read_sas('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat')
+
 
 # clean, select ew or vw
 yz_ret = temp %>% 
@@ -112,12 +129,15 @@ yz_sum = yz_ret %>%
     rbar = mean(ret), vol = sd(ret), nmonth = n(), traw = rbar/vol*sqrt(nmonth), tabs = abs(traw)
   )
 
+
+
+
 # SAVE TO DISK ====
 
 
 save(
   list = c(
-    'cz_ret','cz_sum', 'yz_ret', 'yz_sum'
+    'cz_ret','cz_sum', 'clz_ret', 'clz_sum', 'yz_ret', 'yz_sum'
     )
   , file = '../data/emp_data.Rdata'
 )

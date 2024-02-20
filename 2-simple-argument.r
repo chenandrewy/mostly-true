@@ -1,13 +1,14 @@
 # super simple now (2022 04)
+# outputs figures to ../results/
+#   dm-intuition.pdf and hlz-intuition.pdf
+#   also gamma-intuition.pdf (not used in paper anymore)
+
+# Setup -------------------------------------------------------------------
 
 
-# SETUP ====
 rm(list = ls())
 source('0-functions.r')
-library(tidyverse)
-library(data.table)
 load('../data/emp_data.Rdata')
-
 
 h_disc = 2
 
@@ -46,7 +47,7 @@ make_dist_dat = function(F1, edge1, F2, edge2, x_match = c(-Inf,Inf), N1 = 1, sh
 theme_set(
   theme_minimal() +
     theme(
-      text = element_text(family = "Palatino Linotype")
+      # text = element_text(family = "Palatino Linotype")
     )
 )
 
@@ -56,19 +57,17 @@ theme_set(
 
 # Data-Mining -------------------------------------------------------------
 
-
-
 # fdr calculations
-F_yz = ecdf(yz_sum$tabs)
-Pr_disc = 1-F_yz(h_disc)
+F_dm = ecdf(clz_sum$tabs)
+Pr_disc = 1-F_dm(h_disc)
 # Pr_disc_F = 2*(1-pnorm(h_disc))
 Pr_disc_F = 0.05
 fdrmax = Pr_disc_F/Pr_disc
-n_yz = length(yz_sum$tabs)
+n_dm = length(clz_sum$tabs)
 
 # make data for plotting 
 edge = seq(0,10,0.5)
-plotme = make_dist_dat(F_yz, edge, F_yz, edge, N1 = n_yz)
+plotme = make_dist_dat(F_dm, edge, F_dm, edge, N1 = n_dm)
 
 # plot 
 ggplot(plotme, aes(x=mids, y=dF)) +
@@ -105,7 +104,7 @@ ggplot(plotme, aes(x=mids, y=dF)) +
     , x = 6.7, y = 1800
   )   
 
-ggsave('../results/yz-intuition.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave('../results/dm-intuition.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 
 
@@ -122,6 +121,7 @@ F_hlz = function(tabs) pgamma(tabs, shape = 1, scale = 2)
 fit = est_trunc_gamma(cz_sum$tabs, tgood = 2.6, shape = 0.5)
 F_gamma = function(tabs) pgamma(tabs, shape = fit$shape, scale = fit$scale)
 
+mean(cz_sum$tabs) - 2
 
 ## make plotting data ====
 # define scaling
@@ -214,7 +214,6 @@ ggplot(data = plotmeboth, aes(x=mids, y=dF)) +
 
 
   
-
 ggsave('../results/hlz-intuition.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 
@@ -301,17 +300,18 @@ ggplot(data = plotme, aes(x=mids, y=dF)) +
   )
 
 
-
-
 ggsave('../results/hlz-intuition.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 
+cz_sum %>% filter(tabs>3.0) %>% summarize(mean_t_gt_2 = mean(tabs)) %>% 
+  mutate(scale = mean_t_gt_2 - 3)
 
 
-
-
+clz_sum %>% filter(tabs>2.0) %>% summarize(mean_t_gt_2 = mean(tabs)) %>% 
+  mutate(scale = mean_t_gt_2 - 2)
 
 # Extrapolated Gamma -----------------------------------------------------------
+# not used after 2024 01
 
 ## define distributions
 
