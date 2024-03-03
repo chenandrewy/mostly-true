@@ -1,12 +1,18 @@
 # 2022 05 10: simulation for yz data only
 
-# SETUP ====
+# about 10 min for 1000 simulations
+
+# Setup -----------------------------------------------------------------------
 rm(list=ls())
 source('0-functions.r')
 
 load('../data/emp_data.Rdata')
 
 ## User Settings ====
+
+# select data
+dm_ret = clz_ret # yz_ret or clz_ret
+dm_sum = clz_sum
 
 # data cleaning 
 min_nmonth = 200
@@ -28,21 +34,15 @@ set.seed(1120)
 # fdr estimation
 h_disc = 2 # cutoff for a discovery
 fdrhat_numer = 0.05 # plug in this for Pr(F|disc)
-
-
 # PREP RESIDUALS  ====
-yzmonthsum = yz_ret %>%
+dmmonthsum = dm_ret %>%
   group_by(date) %>%
   summarize(nsignal = sum(!is.na(ret)))
 
-# yz residuals
-resid = yz_ret %>% 
-    left_join(
-      yz_sum, by = 'signalname'
-    ) %>%
-    left_join(
-      yzmonthsum, by = 'date'
-    ) %>%
+# dm residuals
+resid = dm_ret %>% 
+    left_join(dm_sum, by = 'signalname') %>%
+    left_join(dmmonthsum, by = 'date') %>%
     filter(
       nmonth >= min_nmonth, nsignal >= min_nsignal, !is.na(ret)
     ) %>% 
@@ -71,18 +71,24 @@ eboot = emat[dateselect, ]
 
 # select subset to plot (otherwise it takes forever)
 nplot = 1000
-isim = sample(1:N, nplot, replace = F)
-iemp = sample(1:length(unique(yz_ret$signalname)), nplot, replace = F)
 
 # find correlation matricies
+isim = sample(1:N, nplot, replace = F)
 csim = cor(eboot[ , isim], use = 'pairwise.complete.obs')
 csim2 = csim[lower.tri(csim)]
 
-temp = yz_ret %>% 
-  pivot_wider(
-    names_from = signalname, values_from = ret
-  ) %>% 
-  select(-date)
+temp = dm_ret %>% 
+    left_join(dm_sum, by = 'signalname') %>%
+    left_join(dmmonthsum, by = 'date') %>%
+    filter(
+      nmonth >= min_nmonth, nsignal >= min_nsignal, !is.na(ret)
+    ) %>% 
+    select(date, signalname, ret) %>%
+    pivot_wider(
+      names_from = signalname, values_from = ret
+    ) %>% 
+    select(-date)
+iemp = sample(1:ncol(temp), nplot, replace = F)    
 cemp = cor(temp[ , iemp], use = 'pairwise.complete.obs')
 cemp2 = cemp[lower.tri(cemp)]
 
@@ -98,19 +104,18 @@ edge = seq(-1,1,0.05)
 plotme = cdat %>% 
   group_by(group) %>% 
   summarise(
-    cmid = hist(c,edge)$mids
-    , density = hist(c,edge)$density
+    cmid = hist(c,edge,plot=F)$mids
+    , density = hist(c,edge,plot=F)$density
   ) %>% 
   mutate(
     group = factor(
       group
       , levels = c('sim','emp')
-      , labels = c('Simulated','Yan-Zheng Data')
+      , labels = c('Simulated','Empirical')
     )
   )
 
-
-ggplot(
+plt = ggplot(
   plotme, aes(x=cmid, y=density, group = group)
 ) +
   geom_line(
@@ -136,14 +141,10 @@ ggplot(
     values=c(NICEBLUE, 'gray')
   ) +
   scale_linetype_manual(values = c('solid','31'))
+ggsave(filename = '../results/cor-theory-free.pdf', width = 5, height = 4)
 
 
-ggsave(
-  filename = '../results/cor-theory-free.pdf', width = 5, height = 4
-)
-
-
-# SIMULATE MANY TIMES ====
+# Simulate nsim times --------------------------------------------------------
 
 simdat = tibble()
 
@@ -185,12 +186,16 @@ for (simi in 1:nsim){
       )
 
     # = find fdr (true and estimated) = #
+    h_storey = 0.5
     famstat = cross %>% 
-      filter( tabs > h_disc ) %>% 
       summarize(
-        fdp = mean(!verity), dr = n()/N, fdrmax = fdrhat_numer/dr
-      ) 
-    
+        fdp = sum(!verity & tabs > h_disc)/sum(tabs > h_disc)
+        , dr = sum(tabs > h_disc)/N
+        , fdrmax = fdrhat_numer/dr
+        , pFmax = mean(tabs<h_storey)/(2*(pnorm(h_storey)-0.5))
+        , fdrmax2 = fdrmax*pFmax
+      )
+
     # save 
     temp = cbind(par, famstat) %>% mutate(pari = pari, simi = simi) %>% 
       select(pari, simi, everything())
@@ -203,21 +208,124 @@ for (simi in 1:nsim){
   print(toc - tic)
   
 } # for simi
-
-
 # calculate fdr
 temp = simdat %>% 
   group_by(pari) %>% 
   summarize(
     fdr = mean(fdp)
   )
-
 simdat = simdat %>% 
   left_join(
     temp, by = 'pari'
   )
 
-# TABLE: BOUND CHECK ====
+# make dt
+setDT(simdat)
+
+# Convenience Save --------------------------------------------------------
+save.image('../data/deleteme-sim-theory-free.RData')
+
+# Convenience Load --------------------------------------------------------
+load('../data/deleteme-sim-theory-free.RData')
+
+# Exhibits --------------------------------------------------------
+
+## Figure of fdr actual vs bound w/ storey ====
+plotme = simdat %>% group_by(pF,mutrue) %>% 
+    summarize(fdr_act = 100*mean(fdp), fdr_max = 100*mean(fdrmax)
+      , fdr_max2 = 100*mean(fdrmax2)) %>% 
+    pivot_longer(cols = starts_with('fdr')) %>% 
+    mutate(name=factor(
+      name
+      , levels = c('fdr_max', 'fdr_max2', 'fdr_act')
+      , labels = c('Easy Upper Bound', 'Storey Bound','Actual')
+    ))
+
+# loop over mutrue values
+mutrue_list = unique(plotme$mutrue)
+for (mutruei in mutrue_list){
+  plt = plotme %>% 
+    filter(mutrue == mutruei) %>% 
+    ggplot(aes(x=pF, y=value, group=name)) +
+    geom_line(aes(linetype = name, color=name), size = 1.5) +
+    scale_color_manual(values=c(NICEBLUE, 'gray60', NICERED)) +
+    scale_linetype_manual(values = c('solid', 'dotdash', '31')) +    
+    theme_minimal() +
+    theme(
+      axis.title = element_text(size = 12)
+      , axis.text = element_text(size = 10)      
+      , legend.title = element_blank()
+      , legend.text = element_text(size = 10)
+      , legend.key.size = unit(0.1, 'cm')
+      , legend.position = c(35,80)/100
+      , legend.key.width = unit(1,'cm')    
+      # , legend.spacing.y = unit(0.5, 'cm')
+      , legend.background = element_rect(colour = 'black', fill = 'white')    
+      , panel.grid.minor = element_blank()
+    ) +
+    labs(
+      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
+      , y = TeX('$FDR_{|t|>2}$ (%)')
+    ) +
+    coord_cartesian(ylim = c(0, 100)) +
+    geom_hline(yintercept=0, color='gray50') + 
+    geom_hline(yintercept=100, color='gray50')
+  
+  ggsave(
+    paste0('../results/sim-dm-',mutruei,'.pdf'), plt, width = 5, height = 4
+    , scale = 0.75
+  )
+} # for mutruei
+
+
+
+## Figure of fdr actual vs bound ====
+plotme = simdat %>% group_by(pF,mutrue) %>% 
+    summarize(fdr_act = 100*mean(fdp), fdr_max = 100*mean(fdrmax)) %>% 
+    pivot_longer(cols = c(fdr_act, fdr_max)) %>% 
+    mutate(name=factor(
+      name
+      , levels = c('fdr_max', 'fdr_act')
+      , labels = c('Easy Upper Bound', 'Actual')
+    ))
+
+# loop over mutrue values
+mutrue_list = unique(plotme$mutrue)
+for (mutruei in mutrue_list){
+  plt = plotme %>% 
+    filter(mutrue == mutruei) %>% 
+    ggplot(aes(x=pF, y=value, group=name)) +
+    geom_line(aes(linetype = name, color=name), size = 1.5) +
+    theme_minimal() +
+    theme(
+      axis.title = element_text(size = 12)
+      , axis.text = element_text(size = 10)      
+      , legend.title = element_blank()
+      , legend.text = element_text(size = 10)
+      , legend.key.size = unit(0.1, 'cm')
+      , legend.position = c(35,80)/100
+      , legend.key.width = unit(1,'cm')    
+      # , legend.spacing.y = unit(0.5, 'cm')
+      , legend.background = element_rect(colour = 'black', fill = 'white')    
+      , panel.grid.minor = element_blank()
+    ) +
+    labs(
+      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
+      , y = TeX('$FDR_{|t|>2}$ (%)')
+    ) +
+    scale_color_manual(
+      values=c(NICEBLUE, 'gray')
+    ) +
+    scale_linetype_manual(values = c('solid','31')) +
+    coord_cartesian(ylim = c(0, 100)) +
+    geom_hline(yintercept=0, color='gray50') + 
+    geom_hline(yintercept=100, color='gray50')
+  
+  ggsave(
+    paste0('../results/sim-dm-',mutruei,'.pdf'), plt, width = 5, height = 4
+    , scale = 0.75
+  )
+}    
 
 
 ## table for output ====
@@ -237,7 +345,4 @@ tabout = simdat %>%
   arrange(
     -mutrue, stat
   )
-
-
 write_csv(tabout, '../results/tab-sim-theory-free.csv')
-
