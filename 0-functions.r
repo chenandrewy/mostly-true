@@ -116,3 +116,53 @@ NICEBLUE = "#619CFF"
 NICEGREEN = "#00BA38"
 NICERED = "#F8766D"
 
+# histogram data prep function -----------------------------------------------
+
+# creates data for comparing cdf F1 to cdf F2 in a plot
+# automatically adjusts for different x-binning
+make_dist_dat = function(F1, edge1, N1, F2, edge2, N2
+  , x_match = c(-Inf,Inf), showplot = F){
+  
+  # adjust for different x-binning
+  if (!is.null(x_match)){
+    rescale_fac = diff(F1(x_match))/diff(F2(x_match)) * diff(edge1)[1] /diff(edge2)[1]
+  } else {
+    rescale_fac = 1
+  }
+  
+  # make histogram counts, with normalization adjustments
+  dat = tibble(
+    edge = edge1, F = N1*F1(edge1), group = 1
+  ) %>% 
+    rbind(
+      tibble(
+        edge = edge2, F = N2*F2(edge2)*rescale_fac, group = 2
+      )
+    ) %>% 
+    # take first differences, find midpoints
+    group_by(group) %>% 
+    mutate(
+      F = F
+      , dF = F - lag(F)
+      , mids = 0.5*(edge + lag(edge))
+    ) %>% 
+    filter(!is.na(dF)) %>% 
+    setDT()
+  
+  if (showplot) {
+    dat %>% 
+      ggplot(aes(x=edge, y=dF)) +
+      geom_line(aes(color = group))
+  }
+  
+  return(dat)
+  
+} # make_dist_dat
+
+## set theme ====
+theme_set(
+  theme_minimal() +
+    theme(
+      text = element_text(family = "Palatino Linotype")
+    )
+)

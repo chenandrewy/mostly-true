@@ -12,7 +12,6 @@ library(googledrive)
 # root of March 2022 release on Gdrive
 pathRelease = 'https://drive.google.com/drive/folders/1O18scg9iBTiBaDiQFhoGxdn4FdsbMqGo'
 
-
 # login to gdrive
 # this prompts a login
 pathRelease %>% drive_ls()
@@ -26,7 +25,6 @@ target_dribble = pathRelease %>% drive_ls() %>%
   filter(name=='PredictorPortsFull.csv')
 
 drive_download(target_dribble, path = '../data/PredictorPortsFull.csv', overwrite = T)
-
 
 # download header info
 target_dribble = pathRelease %>% drive_ls() %>% 
@@ -44,7 +42,6 @@ ret0 = fread('../data/PredictorPortsFull.csv') %>%
 
 header = fread('../data/SignalDoc.csv') %>% 
   rename(signalname=Acronym)
-
 
 ## construct benchmark data ====
 # add sample info
@@ -69,7 +66,6 @@ cz_sum = cz_ret %>%
     , traw = rbar/vol*sqrt(nmonth)
     , tabs = abs(traw)
   )
-
 
 # ADD CLZ DATA ====
 # created 2023 12 
@@ -102,42 +98,43 @@ clz_sum = clz_ret %>%
     , tabs = abs(traw)
   )
 
+# ADD CLZ VW DATA ====
+# created 2024 03
+# trying to kick it up a notch
 
-# ADD YZ DATA ====
-# created 2022 04 to read yz data
-# yz data send via email from Sterling Yan in 2019
-# this is simpler b/c no Gdrive stuff, no in-sample stuff, no balancing
+# copy-paste from browser via Chen's website
+url_clz = 'https://drive.google.com/drive/folders/16RqeHNyU5gcqjRUvqSeOfQCxu_B2mfcZ'
 
-library(haven) # for read_sas
+target_dribble = url_clz %>% drive_ls() %>% 
+  filter(name=='DataMinedLongShortReturnsVW.csv')
 
-temp = read_sas('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat')
+drive_download(target_dribble, path = '../data/CLZvw_raw.csv', overwrite = T)
 
+# clean up
+temp0 = fread('../data/CLZvw_raw.csv') 
 
-# clean, select ew or vw
-yz_ret = temp %>% 
-  mutate(
-    signalname = paste(transformation, fsvariable, sep = '.')
-  ) %>% 
-  transmute(
-    signalname, date = DATE, ret = 100*ddiff_ew
-  )
+clzvw_ret = temp0 %>% 
+  mutate(date = paste(year, month, '28', sep = '-')
+      , date = as.Date(date, format = '%Y-%m-%d')) %>% 
+  transmute(signalname = signalid, date, ret)
 
-# find summary stats
-yz_sum = yz_ret %>% 
+# repeatedly used summary stats (in-sample)
+clzvw_sum = clzvw_ret %>% 
   group_by(signalname) %>% 
   summarize(
-    rbar = mean(ret), vol = sd(ret), nmonth = n(), traw = rbar/vol*sqrt(nmonth), tabs = abs(traw)
-  )
-
-
-
+    rbar = mean(ret)
+    , vol = sd(ret)
+    , nmonth = n()
+    , traw = rbar/vol*sqrt(nmonth)
+    , tabs = abs(traw)
+  )  
 
 # SAVE TO DISK ====
-
 
 save(
   list = c(
     'cz_ret','cz_sum', 'clz_ret', 'clz_sum', 'yz_ret', 'yz_sum'
+    , 'clzvw_ret', 'clzvw_sum'
     )
   , file = '../data/emp_data.Rdata'
 )

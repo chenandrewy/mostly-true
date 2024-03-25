@@ -1,61 +1,11 @@
 # super simple now (2022 04)
 # outputs figures to ../results/
 #   dm-intuition.pdf and hlz-intuition.pdf
-
 # Setup -------------------------------------------------------------------
 
 rm(list = ls())
 source('0-functions.r')
 load('../data/emp_data.Rdata')
-
-# creates data for comparing cdf F1 to cdf F2 in a plot
-# automatically adjusts for different x-binning
-make_dist_dat = function(F1, edge1, N1, F2, edge2, N2
-  , x_match = c(-Inf,Inf), showplot = F){
-  
-  # adjust for different x-binning
-  if (!is.null(x_match)){
-    rescale_fac = diff(F1(x_match))/diff(F2(x_match)) * diff(edge1)[1] /diff(edge2)[1]
-  } else {
-    rescale_fac = 1
-  }
-  
-  # make histogram counts, with normalization adjustments
-  dat = tibble(
-    edge = edge1, F = N1*F1(edge1), group = 1
-  ) %>% 
-    rbind(
-      tibble(
-        edge = edge2, F = N2*F2(edge2)*rescale_fac, group = 2
-      )
-    ) %>% 
-    # take first differences, find midpoints
-    group_by(group) %>% 
-    mutate(
-      F = F
-      , dF = F - lag(F)
-      , mids = 0.5*(edge + lag(edge))
-    ) %>% 
-    filter(!is.na(dF)) %>% 
-    setDT()
-  
-  if (showplot) {
-    dat %>% 
-      ggplot(aes(x=edge, y=dF)) +
-      geom_line(aes(color = group))
-  }
-  
-  return(dat)
-  
-} # make_dist_dat
-
-## set theme ====
-theme_set(
-  theme_minimal() +
-    theme(
-      text = element_text(family = "Palatino Linotype")
-    )
-)
 
 # Data-Mining -------------------------------------------------------------
 
@@ -193,8 +143,9 @@ cz_sum %>% filter(tabs>3.0) %>% summarize(mean_t_gt_2 = mean(tabs)) %>%
   mutate(scale = mean_t_gt_2 - 3)
 clz_sum %>% filter(tabs>2.0) %>% summarize(mean_t_gt_2 = mean(tabs)) %>% 
   mutate(scale = mean_t_gt_2 - 2)
-# Data-Mining with Storey ----------------------------------------
+# Data-Mining with Storey w/ EZ benchmark ----------------------------------------
 
+## plot setup ====
 # fdr calculations
 h_disc = 2
 F_dm = ecdf(clz_sum$tabs)
@@ -211,40 +162,83 @@ pF # check...
 
 # make data for plotting 
 edge = seq(0,10,0.5)
-plotme = make_dist_dat(F_dm, edge, n_dm, F_null, edge, n_dm*pF, x_match = NULL) %>% 
+temp1 = make_dist_dat(F_dm, edge, n_dm, F_null, edge, n_dm*pF, x_match = NULL) %>% 
   mutate(group=factor(group,levels=c(1,2),labels=c('emp','null')))
+temp2 = make_dist_dat(F_dm, edge, n_dm, F_null, edge, n_dm*1, x_match = NULL) %>% 
+  mutate(group=factor(group,levels=c(1,2),labels=c('emp','null_ez')))
+plotme = temp1 %>% rbind(temp2 %>% filter(group=='null_ez'))
 
-# plot try 2
-plt = ggplot(plotme[group=='emp'], aes(x=mids, y=dF)) +
-  coord_cartesian(xlim = c(0,8)) +
+## plot start ====
+color_emp = 'gray50'
+color_null = MATRED
+bar_alpha = 0.65
+ylimnum = c(0, 12000)
+discovery_y = 11000
+intuition_y = 3600
+yticks = seq(0,12000,2000)
+
+# plot easy null
+plt = ggplot(plotme[group!='null'], aes(x=mids, y=dF)) +
+  coord_cartesian(xlim = c(0,8), ylim=ylimnum) +
+  scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
-  ylab('Number of Strategies') +
-  # emp bars 
-  geom_bar(stat='identity', position='identity', fill='gray') +
+  ylab('Number of Strategies') +  
+  # bars 
+  geom_bar(stat='identity', position='identity', alpha=bar_alpha
+    , aes(fill=group)) +
+  scale_fill_manual(values=c(color_emp, color_null)
+    , labels=c('Data', paste0('False = ', round(1*100,0), '% of Data'))
+    , name='') +     
   # discovery line 
   geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(geom='text', x=2.1, y=5400, hjust = 0
+  annotate(geom='text', x=2.1, y=discovery_y, hjust = 0
     , label='Discoveries ->', color = MATRED) +
-  # null bars
-  geom_bar(data=plotme[group=='null']
-    , stat='identity', position='identity', alpha = 0.7
-    , aes(fill=group)) +
-  scale_fill_manual(values=c('null'=MATRED), labels=c('null'='False (56% of Total)')
-    , name='') +
   theme(legend.position = c(80,80)/100) +
   # write out intuition
   geom_segment(aes(xend = 22/10, yend = 250, x = 3.2, y = 2300),
     arrow = arrow(length = unit(0.03, "npc")),
     colour = "black", size = 0.1
   ) +  
-  annotate(geom = 'text', x = 33/10, y = 2600, hjust = 0,
+  annotate(geom = 'text', x = 33/10, y = intuition_y, hjust = 0
     , label = TeX(paste0(
-    'FDR $\\leq \\frac{5\\%}{', round(Pr_disc,2), '}('
-      , round(pF,2),')$ = '
+    'FDR $\\leq \\frac{5\\%}{', round(Pr_disc,2), '}$ ('
+      ,'1.00) = '
+      , round(fdrmax*1*100, 0), '%'
+    ))    
+  ) 
+
+ggsave('../results/dm-viz-ez.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+# plot storey null
+plt = ggplot(plotme[group!='null_ez'], aes(x=mids, y=dF)) +
+  coord_cartesian(xlim = c(0,8), ylim=ylimnum) +
+  scale_y_continuous(breaks = yticks) +  
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
+  ylab('Number of Strategies') +  
+  # bars 
+  geom_bar(stat='identity', position='identity', alpha=bar_alpha
+    , aes(fill=group)) +
+  scale_fill_manual(values=c(color_emp, color_null)
+    , labels=c('Data', paste0('False = ', round(pF*100,0), '% of Data'))
+    , name='') +     
+  # discovery line 
+  geom_vline(xintercept = h_disc, color = MATRED) +
+  annotate(geom='text', x=2.1, y=discovery_y, hjust = 0
+    , label='Discoveries ->', color = MATRED) +
+  theme(legend.position = c(80,80)/100) +
+  # write out intuition
+  geom_segment(aes(xend = 22/10, yend = 250, x = 3.2, y = 2300),
+    arrow = arrow(length = unit(0.03, "npc")),
+    colour = "black", size = 0.1
+  ) +  
+  annotate(geom = 'text', x = 33/10, y = intuition_y, hjust = 0,
+    , label = TeX(paste0(
+    'FDR $\\leq \\frac{5\\%}{', round(Pr_disc,2), '}$ ('
+      , round(pF,2), ') = '
       , round(fdrmax*pF*100, 0), '%'
     ))    
   )   
 
-ggsave('../results/dm-storey.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave('../results/dm-viz-storey.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
