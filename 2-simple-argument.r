@@ -188,7 +188,8 @@ plt = ggplot(plotme[group!='null'], aes(x=mids, y=dF)) +
   geom_bar(stat='identity', position='identity', alpha=bar_alpha
     , aes(fill=group)) +
   scale_fill_manual(values=c(color_emp, color_null)
-    , labels=c('Data', paste0('False = ', round(1*100,0), '% of Data'))
+    # , labels=c('Data', paste0('False = ', round(1*100,0), '% of Data'))
+    , labels=c('Data', paste0('False Upper Bound'))    
     , name='') +     
   # discovery line 
   geom_vline(xintercept = h_disc, color = MATRED) +
@@ -220,7 +221,8 @@ plt = ggplot(plotme[group!='null_ez'], aes(x=mids, y=dF)) +
   geom_bar(stat='identity', position='identity', alpha=bar_alpha
     , aes(fill=group)) +
   scale_fill_manual(values=c(color_emp, color_null)
-    , labels=c('Data', paste0('False = ', round(pF*100,0), '% of Data'))
+    # , labels=c('Data', paste0('False = ', round(pF*100,0), '% of Data'))
+    , labels=c('Data', paste0('False Upper Bound'))    
     , name='') +     
   # discovery line 
   geom_vline(xintercept = h_disc, color = MATRED) +
@@ -242,3 +244,7 @@ plt = ggplot(plotme[group!='null_ez'], aes(x=mids, y=dF)) +
 
 ggsave('../results/dm-viz-storey.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
+F_dm(0.5)
+F_dm(0.5)*n_dm
+F_null(0.5)
+22/38
