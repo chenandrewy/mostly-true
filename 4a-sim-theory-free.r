@@ -237,112 +237,54 @@ plotme = simdat %>% group_by(pF,mutrue) %>%
     pivot_longer(cols = starts_with('fdr')) %>% 
     mutate(name=factor(
       name
-      , levels = c('fdr_max', 'fdr_max2', 'fdr_act')
-      , labels = c('Easy Upper Bound', 'Storey Bound','Actual')
+      # , levels = c('fdr_max', 'fdr_max2', 'fdr_act')
+      # , labels = c('Easy Upper Bound', 'Storey Bound','Actual')
+      , levels = c('fdr_act', 'fdr_max2', 'fdr_max')
+      , labels = c('Actual', 'Storey Bound', 'Easy Upper Bound')
     ))
+
+# reordering legend (but preserving plotting order)
+# https://stackoverflow.com/questions/50420205/how-to-reorder-overlaying-order-of-geoms-but-keep-legend-order-intact-in-ggplot
+plotme$id2 = factor(plotme$name, levels = c('Easy Upper Bound', 'Storey Bound', 'Actual'))
 
 # loop over mutrue values
 mutrue_list = unique(plotme$mutrue)
-for (mutruei in mutrue_list){
+for (mutruei in mutrue_list){  
+
   plt = plotme %>% 
     filter(mutrue == mutruei) %>% 
     ggplot(aes(x=pF, y=value, group=name)) +
-    geom_line(aes(linetype = name, color=name), size = 1.5) +
-    scale_color_manual(values=c(NICEBLUE, 'gray60', NICERED)) +
-    scale_linetype_manual(values = c('solid', 'dotdash', '31')) +    
+    geom_hline(yintercept=0, color='gray50') + 
+    geom_hline(yintercept=100, color='gray50') +    
+    # plot FDR and bounds
+    geom_line(aes(linetype = name, color=name), size = 1.2) +
+    scale_color_manual(values=c('Easy Upper Bound'='gray60', 'Storey Bound'=MATBLUE, 'Actual'=MATRED)
+      , breaks=levels(plotme$id2)) +
+    scale_linetype_manual(values = c('Easy Upper Bound'='dotdash', 'Storey Bound'='31', 'Actual'='solid')
+      , breaks=levels(plotme$id2)) +
     theme_minimal() +
     theme(
-      axis.title = element_text(size = 12)
+      text = element_text(family = "Palatino Linotype")
+      , axis.title = element_text(size = 12)
       , axis.text = element_text(size = 10)      
       , legend.title = element_blank()
       , legend.text = element_text(size = 10)
       , legend.key.size = unit(0.1, 'cm')
-      , legend.position = c(35,80)/100
+      , legend.position = c(30,75)/100
       , legend.key.width = unit(1,'cm')    
       # , legend.spacing.y = unit(0.5, 'cm')
-      , legend.background = element_rect(colour = 'black', fill = 'white')    
+      , legend.background = element_rect(colour = 'white', fill = 'white')    
       , panel.grid.minor = element_blank()
     ) +
     labs(
       x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
       , y = TeX('$FDR_{|t|>2}$ (%)')
     ) +
-    coord_cartesian(ylim = c(0, 100)) +
-    geom_hline(yintercept=0, color='gray50') + 
-    geom_hline(yintercept=100, color='gray50')
+    coord_cartesian(ylim = c(0, 100)) 
   
   ggsave(
-    paste0('../results/sim-dm-',mutruei,'.pdf'), plt, width = 5, height = 4
-    , scale = 0.75
+    paste0('../results/sim-dm-storey-',mutruei,'.pdf'), plt, width = 8, height = 4
+    , scale = 0.6, device = cairo_pdf
   )
 } # for mutruei
 
-
-
-## Figure of fdr actual vs bound ====
-plotme = simdat %>% group_by(pF,mutrue) %>% 
-    summarize(fdr_act = 100*mean(fdp), fdr_max = 100*mean(fdrmax)) %>% 
-    pivot_longer(cols = c(fdr_act, fdr_max)) %>% 
-    mutate(name=factor(
-      name
-      , levels = c('fdr_max', 'fdr_act')
-      , labels = c('Easy Upper Bound', 'Actual')
-    ))
-
-# loop over mutrue values
-mutrue_list = unique(plotme$mutrue)
-for (mutruei in mutrue_list){
-  plt = plotme %>% 
-    filter(mutrue == mutruei) %>% 
-    ggplot(aes(x=pF, y=value, group=name)) +
-    geom_line(aes(linetype = name, color=name), size = 1.5) +
-    theme_minimal() +
-    theme(
-      axis.title = element_text(size = 12)
-      , axis.text = element_text(size = 10)      
-      , legend.title = element_blank()
-      , legend.text = element_text(size = 10)
-      , legend.key.size = unit(0.1, 'cm')
-      , legend.position = c(35,80)/100
-      , legend.key.width = unit(1,'cm')    
-      # , legend.spacing.y = unit(0.5, 'cm')
-      , legend.background = element_rect(colour = 'black', fill = 'white')    
-      , panel.grid.minor = element_blank()
-    ) +
-    labs(
-      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
-      , y = TeX('$FDR_{|t|>2}$ (%)')
-    ) +
-    scale_color_manual(
-      values=c(NICEBLUE, 'gray')
-    ) +
-    scale_linetype_manual(values = c('solid','31')) +
-    coord_cartesian(ylim = c(0, 100)) +
-    geom_hline(yintercept=0, color='gray50') + 
-    geom_hline(yintercept=100, color='gray50')
-  
-  ggsave(
-    paste0('../results/sim-dm-',mutruei,'.pdf'), plt, width = 5, height = 4
-    , scale = 0.75
-  )
-}    
-
-
-## table for output ====
-tabout = simdat %>% 
-  group_by(pF, mutrue) %>%
-  summarize(
-    x1_fdr = mean(fdr)*100
-    , x2_ave = mean(fdrmax/fdr)
-    , x4_pct_ok =mean(fdrmax > fdr) *100
-  ) %>% 
-  pivot_longer(
-    cols = starts_with('x'), names_to = 'stat', values_to = 'value'
-  ) %>% 
-  pivot_wider(
-    names_from = pF, names_prefix = 'pF_', values_from = 'value'
-  ) %>% 
-  arrange(
-    -mutrue, stat
-  )
-write_csv(tabout, '../results/tab-sim-theory-free.csv')
