@@ -1,12 +1,50 @@
 # 2022 05 10: simulation for cz data 
 
-# takes about 10 minutes
+# takes about 2 minutes for nsim = 200
 
-# SETUP ====
+# Setup -----------------------------------------------------------------------
 rm(list=ls())
 source('0-functions.r')
 
 load('../data/emp_data.Rdata')
+
+## User entry ====
+
+# data cleaning 
+min_nmonth = 200
+min_nsignal = 100
+
+# dimensions
+N = 1e4
+nsim = 200
+ndate = 200
+weight_emp = 0.65 # 0.65  matches the cor dist well
+vol_noise = mean(cz_sum$vol)
+
+# parameters
+pF_list     = c(0.01, seq(0.05, 0.95, 0.05), 0.99)
+mutrue_list = c(0.25, 0.5, 0.75)
+tgood_list = c(2.6) # should not be a list for now
+
+tbad = 1.96
+smarg = 0.5
+
+# fdr estimation
+h_disc = 2.0 # cutoff for a discovery
+fdrhat_numer = 0.05
+tgoodhat = 2.0
+
+parlist = expand_grid(
+  pF = pF_list, mutrue = mutrue_list, tgood = tgood_list, tbad, smarg
+)
+parlist = parlist %>% 
+  mutate(pari = 1:dim(parlist)[1]) %>% 
+  select(pari, everything())
+
+# seed
+set.seed(1120)
+
+## Functions ====
 
 # bootstraps residual effects om crpss=sectopm
 sim_noise = function(emat, N, ndate, weight_emp, vol_noise){
@@ -29,7 +67,7 @@ sim_noise = function(emat, N, ndate, weight_emp, vol_noise){
 
 # turns residuals into a cross section 
 sim_other_stuff = function(cross0, N, par){
-  
+
   cross = cross0 %>% 
     mutate(
       signalid = 1:N
@@ -53,82 +91,6 @@ sim_other_stuff = function(cross0, N, par){
   
 } # end sim_other_stuff
 
-# creates data for comparing cdf F1 to cdf F2 in a plot
-make_dist_dat = function(F1, edge1, F2, edge2, x_match = c(-Inf,Inf), N1 = 1, showplot = F){
-  
-  rescale_fac = diff(F1(x_match))/diff(F2(x_match)) * diff(edge1)[1] /diff(edge2)[1]
-  
-  dat = tibble(
-    edge = edge1, F = F1(edge1), group = 1
-  ) %>% 
-    rbind(
-      tibble(
-        edge = edge2, F = F2(edge2)*rescale_fac, group = 2
-      )
-    ) %>% 
-    group_by(group) %>% 
-    mutate(
-      F = N1*F
-      , dF = F - lag(F)
-      , mids = 0.5*(edge + lag(edge))
-      , group = factor(group, levels = c(1,2))
-    ) %>% 
-    filter(!is.na(dF))
-  
-  if (showplot) {
-    dat %>% 
-      ggplot(aes(x=edge, y=dF)) +
-      geom_line(aes(color = group))
-  }
-  
-  return(dat)
-  
-} # make_dist_dat
-
-
-## User entry ====
-
-# data cleaning 
-min_nmonth = 200
-min_nsignal = 100
-
-# dimensions
-N = 1e4
-ndate = 200
-nsim = 1000
-weight_emp = 0.9
-vol_noise = mean(cz_sum$vol)
-
-# parameters
-pF_list     = c(seq(0.5, 0.9, 0.1), 0.95, 0.99)
-mutrue_list = c(0.25, 0.375, 0.5, 0.75)
-# mutrue_list = seq(0.1, 0.5, 0.1)
-tgood_list = c(2.6, 5.0)
-
-tbad = 1.96
-smarg = 0.5
-
-parlist = expand_grid(
-  pF = pF_list
-  , mutrue = mutrue_list
-  , tgood = tgood_list
-  , tbad
-  , smarg
-)
-parlist = parlist %>% 
-  mutate(pari = 1:dim(parlist)[1]) %>% 
-  select(pari, everything())
-
-
-# seed
-set.seed(1120)
-
-# fdr estimation
-h_disc = 2.0 # cutoff for a discovery
-fdrhat_numer = 0.05
-tgoodhat = 2.6 # 
-
-
 ## Prep Residuals  ====
 monthsum = cz_ret %>%
   group_by(date) %>%
@@ -136,19 +98,11 @@ monthsum = cz_ret %>%
 
 # residuals
 resid = cz_ret %>% 
-  left_join(
-    cz_sum, by = 'signalname'
-  ) %>%
-  left_join(
-    monthsum, by = 'date'
-  ) %>%
-  filter(
-    nmonth >= min_nmonth, nsignal >= min_nsignal, !is.na(ret)
-  ) %>% 
+  left_join(cz_sum, by = 'signalname') %>%
+  left_join(monthsum, by = 'date') %>%
+  filter(nmonth >= min_nmonth, nsignal >= min_nsignal, !is.na(ret)) %>% 
   group_by(signalname) %>% 
-  mutate(
-    e = as.vector(scale(ret, center = T, scale = F))
-  )
+  mutate(e = as.vector(scale(ret, center = T, scale = F)))
 
 emat = resid %>% 
   pivot_wider(
@@ -159,7 +113,7 @@ emat = resid %>%
   select(-date) %>% 
   as.matrix() 
 
-# FIG: COR DIST ====
+# FIG: COR DIST ----------------------------------------------------------------
 
 # simulate residuals once
 set.seed(339)
@@ -170,7 +124,7 @@ eboot = weight_emp* emat[dateselect, signalselect] +
       (1-weight_emp)*matrix(rnorm(N*ndate, 0, vol_noise), nrow = ndate)
 
 # select subset to plot (for sim only)
-nplot = 1000
+nplot = 2000
 isim = sample(1:N, nplot, replace = F)
 
 # find correlation matricies
@@ -178,28 +132,21 @@ csim = cor(eboot[ , isim], use = 'pairwise.complete.obs')
 csim2 = csim[lower.tri(csim)]
 
 temp = cz_ret %>% 
-  pivot_wider(
-    names_from = signalname, values_from = ret
-  ) %>% 
+  pivot_wider(names_from = signalname, values_from = ret) %>% 
   select(-date)
-cemp = cor(temp, use = 'pairwise.complete.obs')
+# cemp = cor(temp, use = 'pairwise.complete.obs')
+  cemp = cor(emat, use = 'pairwise.complete.obs')
 cemp2 = cemp[lower.tri(cemp)]
 
-cdat = data.frame(
-  c = csim2, group = 'sim', color = NICEBLUE
-) %>% rbind(
-  data.frame(
-    c = cemp2 , group = 'emp', color = 'gray'
-  ) 
+cdat = data.frame(c = csim2, group = 'sim', color = NICEBLUE) %>% 
+rbind(
+  data.frame(c = cemp2 , group = 'emp', color = 'gray') 
 )
 
-edge = seq(-1,1,0.1)
+edge = seq(-1,1,0.05)
 plotme = cdat %>% 
   group_by(group) %>% 
-  summarise(
-    cmid = hist(c,edge)$mids
-    , density = hist(c,edge)$density
-  ) %>% 
+  summarise(cmid = hist(c,edge)$mids, density = hist(c,edge)$density) %>% 
   mutate(
     group = factor(
       group
@@ -207,9 +154,7 @@ plotme = cdat %>%
       , labels = c('Simulated','Chen-Zimmermann Data')
     )
   )
-
-
-ggplot(
+plt = ggplot(
   plotme, aes(x=cmid, y=density, group = group)
 ) +
   geom_line(
@@ -235,23 +180,17 @@ ggplot(
     values=c(NICEBLUE, 'gray')
   ) +
   scale_linetype_manual(values = c('solid','31'))
+ggsave(filename = '../results/cor-extrap-pub.pdf', 
+  , width = 5, height = 4)
 
+# Simulate many times ----------------------------------------------------------
 
-ggsave(
-  filename = '../results/cor-extrap-pub.pdf', width = 5, height = 4
-)
-
-
-# SIMULATE MANY TIMES ====
-
-truthlist = tibble()
-estlist = tibble()
 for (simi in 1:nsim){
-  tic = Sys.time()
-  
-  print(
-    paste0('sim-extrap-pub: simi = ', simi, ' nsim = ', nsim)
-  )
+
+  if (simi==1){truthlist = tibble(); estlist = tibble()}
+
+  tic = Sys.time()  
+  print(paste0('sim-extrap-pub: simi = ', simi, ' nsim = ', nsim))
   
   # simulate noise (reuse for each par)
   cross0 = sim_noise(emat, N, ndate, weight_emp, vol_noise)
@@ -271,25 +210,26 @@ for (simi in 1:nsim){
       mutate(
         npub = dim(pubcross)[1]
         , h_disc = h_disc
-        , fdp = mean(!cross$verity[cross$tabs > h_disc])
-        , dr  = sum(cross$tabs > h_disc)/N
+        , fdp = mean(!pubcross$verity[pubcross$tabs > h_disc]) # unclear if should be cross or pubcross
         , simi = simi
         , pari = pari
       ) %>% 
       select(pari, simi, everything())
     
     # extrapolate and estimate fdrmax
+    h_storey = 0.5
     temp.exp = est_trunc_gamma(pubcross$tabs, tgoodhat, 1) %>% as_tibble()
-    temp.alt = est_trunc_gamma(pubcross$tabs, tgoodhat, 0.5) %>% as_tibble()
+    temp.alt = est_trunc_gamma(pubcross$tabs, tgoodhat, 0.5) %>% as_tibble()    
     fit = rbind(temp.exp, temp.alt) %>% 
-      mutate(
-        h_disc = h_disc
-        , dr_hat = 1-pgamma(h_disc, shape = shape, scale = scale)
-        , fdrmax = fdrhat_numer/dr_hat
+      mutate(h_disc = h_disc
+        , dr_hat = 1-pgamma(h_disc, shape=shape, rate=1/scale)
+        , fdrmax = pmin(fdrhat_numer/dr_hat, 1)
+        , pFmax = pmin(pgamma(h_storey, shape-shape, rate=1/scale)/(2*(pnorm(h_storey) - 0.5)), 1)
+        , fdrmax2 = fdrmax*pFmax
       ) %>% 
       mutate(simi = simi, pari = pari) %>% 
       select(pari, simi, everything())
-    
+   
     # store
     truthlist = rbind(truthlist, truth)
     estlist = rbind(estlist, fit)
@@ -301,14 +241,12 @@ for (simi in 1:nsim){
 
 } # for simi
 
+## Clean up, make simdat ----------------------------------------------------------
 
-# TABLE: BOUND CHECK ====
-
+# calculate fdr
 temp = truthlist %>% 
   group_by(pari) %>% 
-  summarize(
-    fdr = mean(fdp)
-  )
+  summarize(fdr = mean(fdp))
 
 # merge all sim data
 simdat = estlist %>% 
@@ -319,190 +257,190 @@ simdat = estlist %>%
     temp, by = 'pari'
   )
 
+# Convenience Save --------------------------------------------------------
+save.image('../data/deleteme-sim-extrap-pub.RData')
+
+# Convenience Load --------------------------------------------------------
+load('../data/deleteme-sim-extrap-pub.RData')
+
+# Exhibits --------------------------------------------------------
+
+## Figure of fdr actual vs bound w/ gamma fit ====
+
+truthdat = simdat %>% 
+  group_by(pF,mutrue,tgood,tbad,smarg) %>% summarize(fdr=100*mean(fdr)) %>% ungroup() %>% 
+  mutate(name='act')
+fitdat = simdat %>% 
+      group_by(pF,mutrue,tgood,tbad,smarg,shape) %>% summarize(fdr=100*mean(fdrmax)) %>% 
+      ungroup() %>% 
+      mutate(name=if_else(shape==1, 'exp', 'gamma')) %>% 
+      select(-shape) 
+plotme = rbind(truthdat, fitdat) %>% 
+  mutate(pF=100*pF) %>% 
+  mutate(name=factor(name
+    , levels = c('act', 'exp', 'gamma')
+    , labels = c('Actual', 'Exp Easy Bound', 'Gamma Easy Bound')))
+
+# reordering legend (but preserving plotting order)
+# https://stackoverflow.com/questions/50420205/how-to-reorder-overlaying-order-of-geoms-but-keep-legend-order-intact-in-ggplot
+plotme$id2 = factor(plotme$name, levels = c('Gamma Easy Bound', 'Exp Easy Bound', 'Actual'))
+
+# loop over mutrue values
+mutrue_list = unique(plotme$mutrue)
+for (mutruei in mutrue_list){  
+
+  plt = plotme %>% 
+    filter(mutrue == mutruei) %>% 
+    ggplot(aes(x=pF, y=fdr, group=name)) +
+    geom_hline(yintercept=0, color='gray50') + 
+    geom_hline(yintercept=100, color='gray50') +    
+    # plot FDR and bounds
+    geom_line(aes(linetype = name, color=name), size = 1.2) +
+    scale_color_manual(values=c('Exp Easy Bound'='gray60', 'Gamma Easy Bound'=MATBLUE, 'Actual'=MATRED)
+      , breaks=levels(plotme$id2)) +
+    scale_linetype_manual(values = c('Exp Easy Bound'='dotdash', 'Gamma Easy Bound'='31', 'Actual'='solid')
+      , breaks=levels(plotme$id2)) +
+    theme_minimal() +
+    theme(
+      text = element_text(family = "Palatino Linotype")
+      , axis.title = element_text(size = 12)
+      , axis.text = element_text(size = 10)      
+      , legend.title = element_blank()
+      , legend.text = element_text(size = 10)
+      , legend.key.size = unit(0.1, 'cm')
+      , legend.position = c(30,75)/100
+      , legend.key.width = unit(1,'cm')    
+      # , legend.spacing.y = unit(0.5, 'cm')
+      , legend.background = element_rect(colour = 'white', fill = 'white')    
+      , panel.grid.minor = element_blank()
+    ) +
+    labs(
+      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
+      , y = TeX('$FDR_{|t|>2}$ (%)')
+    ) +
+    coord_cartesian(ylim = c(0, 100)) 
   
-## table for output ====
-tabout = simdat %>% 
-  # drop sims with not enough pubs
-  filter(npub > 50) %>% 
-  # force fdr max <= 1 for ease of interpretation
-  mutate(fdrmax = pmin(fdrmax,1)) %>% 
-  group_by(tgood, pF, mutrue, shape) %>%
-  summarize(
-    x1_fdr = min(fdr)*100
-    , x2_fdrmax   = mean(fdrmax)*100
-    , x3_ratio    = mean(fdrmax/fdr)
-    , x3b_ratio_med    = median(fdrmax/fdr)    
-    , x3c_ratio_sd = -sd(fdrmax/fdr)
-    , x4_pctok    = mean(fdrmax>=fdr)*100
-    , x5_npub     = mean(npub)
-  ) %>% 
-  mutate_all(round, 2) %>% 
-  pivot_longer(
-    cols = starts_with('x'), names_to = 'stat', values_to = 'value'
-  ) %>% 
-  pivot_wider(
-    names_from = pF, names_prefix = 'pF_', values_from = 'value'
-  ) %>% 
-  arrange(
-    tgood, -shape, -mutrue, stat, 
+  ggsave(
+    paste0('../results/sim-extrap-gamma-',mutruei,'.pdf'), plt, width = 8, height = 4
+    , scale = 0.6, device = cairo_pdf
   )
+} # for mutruei
 
+## Figure of fdr actual vs bound exp only fit ====
 
-tabsmall = tabout %>% 
-  filter(
-    stat %in% c('x1_fdr', 'x3_ratio', 'x4_pctok'), tgood == 2.6, mutrue <= 0.5
-  ) %>% 
-  arrange(
-    tgood, -mutrue,  -shape, stat
-  ) %>% 
-  print(n = 50)
+truthdat = simdat %>% 
+  group_by(pF,mutrue,tgood,tbad,smarg) %>% summarize(fdr=100*mean(fdr)) %>% ungroup() %>% 
+  mutate(name='act')
+fitdat = simdat %>% 
+      group_by(pF,mutrue,tgood,tbad,smarg,shape) %>% summarize(fdr=100*mean(fdrmax)) %>% 
+      ungroup() %>% 
+      mutate(name=if_else(shape==1, 'exp', 'gamma')) %>% 
+      select(-shape) 
+plotme = rbind(truthdat, fitdat) %>% 
+  mutate(pF=100*pF) %>% 
+  mutate(name=factor(name
+    , levels = c('act', 'exp', 'gamma')
+    , labels = c('Actual', 'Exp Easy Bound', 'Gamma Easy Bound')))
 
-write_csv(tabsmall, '../results/tab-sim-extrap-bench.csv')  
+# reordering legend (but preserving plotting order)
+# https://stackoverflow.com/questions/50420205/how-to-reorder-overlaying-order-of-geoms-but-keep-legend-order-intact-in-ggplot
+plotme$id2 = factor(plotme$name, levels = c('Gamma Easy Bound', 'Exp Easy Bound', 'Actual'))
 
+# loop over mutrue values
+mutrue_list = unique(plotme$mutrue)
+for (mutruei in mutrue_list){  
 
-tabsmall2 = tabout %>% 
-  filter(
-    stat %in% c('x1_fdr', 'x3_ratio', 'x4_pctok'), tgood == 5, mutrue <= 0.5
-  ) %>% 
-  arrange(
-    tgood, -mutrue,  -shape, stat
-  ) %>% 
-  print(n = 50)
+  plt = plotme %>% 
+    filter(mutrue == mutruei) %>% 
+    filter(name != 'Gamma Easy Bound') %>% 
+    ggplot(aes(x=pF, y=fdr, group=name)) +
+    geom_hline(yintercept=0, color='gray50') + 
+    geom_hline(yintercept=100, color='gray50') +    
+    # plot FDR and bounds
+    geom_line(aes(linetype = name, color=name), size = 1.2) +
+    scale_color_manual(values=c('Exp Easy Bound'='gray60', 'Gamma Easy Bound'=MATBLUE, 'Actual'=MATRED)
+      , breaks=levels(plotme$id2)) +
+    scale_linetype_manual(values = c('Exp Easy Bound'='dotdash', 'Gamma Easy Bound'='31', 'Actual'='solid')
+      , breaks=levels(plotme$id2)) +
+    theme_minimal() +
+    theme(
+      text = element_text(family = "Palatino Linotype")
+      , axis.title = element_text(size = 12)
+      , axis.text = element_text(size = 10)      
+      , legend.title = element_blank()
+      , legend.text = element_text(size = 10)
+      , legend.key.size = unit(0.1, 'cm')
+      , legend.position = c(30,75)/100
+      , legend.key.width = unit(1,'cm')    
+      # , legend.spacing.y = unit(0.5, 'cm')
+      , legend.background = element_rect(colour = 'white', fill = 'white')    
+      , panel.grid.minor = element_blank()
+    ) +
+    labs(
+      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
+      , y = TeX('$FDR_{|t|>2}$ (%)')
+    ) +
+    coord_cartesian(ylim = c(0, 100)) 
+  
+  ggsave(
+    paste0('../results/sim-extrap-',mutruei,'.pdf'), plt, width = 8, height = 4
+    , scale = 0.6, device = cairo_pdf
+  )
+} # for mutruei
 
-write_csv(tabsmall2, '../results/tab-sim-extrap-alt.csv')  
+## Illustrate fitting problems ====
+# Fitting problems are consistent with "do t-stat hurdles need to be raised"
+# In principle, the mass below t = 1.96 can be arbitrarily large
+# and this mass is invisible.
 
-# MANUALLY INSPECT ====
+# Previous drafts of "mostly true" dealt with this using a Gamma
+# distribution with shape 1/2, which is just very conservative
+# and does the for reasonable parameter values
+# But the shape 1/2 is both arbitrary and does not allow for
+# closed form estimation (memorylessness)
 
-# set.seed(934)
+# Moreover, the data mining bounds show that the extremely large
+# missing mass is not reasonable. Data mining doesn't generate a crazy
+# large missing mass, so the research process should not either
 
-## settings ====
-tgoodhat = 2.6
+# For these reasons, I'm not sure it's worth including
+# all of these sims
 
-# par = data.frame(pF = 0.8, mutrue = 0.25, tgood = 2.6, tbad = 1.96, smarg = 0.5)
-par = data.frame(pF = 0.9, mutrue = 0.4, tgood = 2.6, tbad = 1.96, smarg = 0.5)
+# find par that violates the bounds
+parbadlist = simdat %>% group_by(mutrue,pF,tgood,tbad,smarg,shape) %>% 
+  summarize(fdr=mean(fdr), fdrmax=mean(fdrmax)) %>% 
+  filter(fdr > fdrmax)
+print(parbadlist)
+parbad = parbadlist[1, ]
 
-shape = 0.5
-
-## sim ===
-# simulate noise (reuse for each par)
+# simulate 
 cross0 = sim_noise(emat, N, ndate, weight_emp, vol_noise)
-
-# simulate mu and add to noise to make rbar, tstat 
-# cross = sim_other_stuff(cross0, N, par)
-# temptrue = rexp(N, rate = 1/par$mutrue)
-temptrue = par$mutrue
-cross = cross0 %>% 
-  mutate(
-    signalid = 1:N
-    , verity = runif(N) > par$pF
-    , mu = verity*temptrue + (1-verity)*0
-  ) %>% 
-  mutate(
-    rbar = mu + ebar, tstat = rbar/vol*sqrt(ndate), tabs = abs(tstat)
-  ) %>% 
-  # sim publication
-  mutate(
-    u = runif(N)
-    , pub = case_when(
-      tabs > par$tbad & tabs <= par$tgood & u < par$smarg ~ T
-      , tabs > par$tgood ~ T
-      , T ~ F # otherwise false
-    )
-  )
-
-
+cross = sim_other_stuff(cross0, N, parbad)
 pubcross = cross %>% filter(pub)
 
-# estimate 
-fit = est_trunc_gamma(pubcross$tabs, tgoodhat, shape = shape) %>% 
-  mutate(
-    dr_hat = 1-pgamma(h_disc, shape = shape, scale = scale)
-    , fdrmax = fdrhat_numer/dr_hat
-  ) 
+# simulate fit and bind
+# exponential
+tgoodhattemp = 2
+Etabs = mean(pubcross$tabs[pubcross$tabs>tgoodhattemp]) - tgoodhattemp
 
-stat.fdr = cross %>% 
-  filter( tabs > h_disc ) %>% 
-  summarize(
-    h_disc = h_disc            
-    , fdp = mean(!verity)
-    , dr = n()/N
-  ) %>% 
-  cbind(
-    fit
+# gamma
+fitgamma = est_trunc_gamma(pubcross$tabs, tgoodhattemp, 1/2, 1)
+
+plotme = tibble(tabs=rexp(N, rate=1/Etabs), name='exp') %>%
+  rbind(
+    tibble(tabs=rgamma(N, shape=fitgamma$shape, rate=1/fitgamma$scale)
+      , name='gamma')
+  ) %>%
+  rbind(
+    tibble(tabs=cross$tabs, name='act')
   )
 
-stat.fdr
-
-## plot ====
-
-
-edge = seq(0,10,0.2)
-tabs_match = 3
-
-edge_fit = seq(0,10,0.1)
-F_fit = function(tabs) pgamma(tabs, shape = fit$shape, scale = fit$scale)
-
-match_fac = sum(cross$tabs > tabs_match) / (1-F_fit(tabs_match)) *
-      diff(edge)[1] /diff(edge_fit)[1]
-
-
-tempdat = tibble(
-  edge = edge_fit, Fdat = F_fit(edge_fit)*match_fac
-) %>% 
-  mutate(
-    dF = Fdat - lag(Fdat), mids = 0.5*(edge + lag(edge)), pub = T, verity = T
-  ) %>% 
-  filter(!is.na(dF))
-
-xlimnum = c(0, quantile(cross$tabs, 0.99)*1.2)
-ylimnum = c(0, max(tempdat$dF)*1)
-
-
-p1 = ggplot(cross, aes(x=tabs, group = pub)) +
-  geom_histogram(aes(fill = pub), breaks = edge, position = 'stack') +
-  geom_line(
-    data = tempdat, aes(x=mids, y=dF)
-  ) + 
-  geom_vline(xintercept = tgoodhat) +
-  theme(legend.position = c(7,7)/10) +
-  coord_cartesian(xlim = xlimnum)
-
-
-p2 = ggplot(cross, aes(x=tabs, group = verity)) +
-  geom_histogram(aes(fill = verity), breaks = edge, position = 'stack') +
-  geom_line(
-    data = tempdat, aes(x=mids, y=dF)
-  ) +
-  scale_fill_brewer() +
-  geom_vline(xintercept = tgoodhat) +
-  theme(legend.position = c(7,7)/10) +
-  coord_cartesian(xlim = xlimnum)
-
-p3 = ggplot(pubcross, aes(x=tabs, group = verity)) +
-  geom_histogram(aes(fill = verity), breaks = edge, position = 'stack') +
-  geom_line(
-    data = tempdat, aes(x=mids, y=dF)
-  ) +
-  scale_fill_economist() +
-  geom_vline(xintercept = tgoodhat) +
-  theme(legend.position = c(7,7)/10) +
-  coord_cartesian(xlim = xlimnum) +
-  ylab('count, pub only')
-
-if (T){
-  ylimmax = 500
-  p1 = p1 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
-  p2 = p2 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
-  p3 = p3 + coord_cartesian(xlim = xlimnum, ylim = c(0,ylimmax))
-}
-
-grid.arrange(p1,p2,p3, nrow = 1)
-
-# show stats to console
-stat.fdr
-
-
-
-# extra check ====
-ggplot(pubcross, aes(x=tabs, group = verity)) +
-  geom_histogram(aes(fill = verity), breaks = edge, position = 'stack')
+# plot
+p = ggplot(plotme, aes(x=tabs)) +
+  # geom_histogram(breaks=seq(0,20,0.2), position='identity', alpha=0.7
+  #   , aes(fill=name)) +
+  geom_density(aes(color=name, linetype=name), size=1.2, adjust=3) +
+  theme_minimal() +
+  coord_cartesian(xlim = c(0, 8)) +
+  scale_x_continuous(breaks = seq(0, 15, 2))
+ggsave('../results/deleteme.pdf')

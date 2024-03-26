@@ -1,6 +1,6 @@
 # 2022 05 10: simulation for yz data only
 
-# about 10 min for 1000 simulations
+# about 10 min for nsim = 1000
 
 # Setup -----------------------------------------------------------------------
 rm(list=ls())
@@ -23,7 +23,7 @@ ndate = 500
 nsim = 1000
 
 # parameters
-pF_list     = c(seq(0.5, 0.9, 0.1), 0.95, 0.99)
+pF_list     = c(0.01, seq(0.05, 0.95, 0.05), 0.99)
 mutrue_list = c(0.25, 0.5, 0.75)
 
 parlist = expand_grid(pF = pF_list, mutrue = mutrue_list)
@@ -143,7 +143,6 @@ plt = ggplot(
   scale_linetype_manual(values = c('solid','31'))
 ggsave(filename = '../results/cor-theory-free.pdf', width = 5, height = 4)
 
-
 # Simulate nsim times --------------------------------------------------------
 
 simdat = tibble()
@@ -232,6 +231,7 @@ load('../data/deleteme-sim-theory-free.RData')
 
 ## Figure of fdr actual vs bound w/ storey ====
 plotme = simdat %>% group_by(pF,mutrue) %>% 
+    mutate(pF = 100*pF) %>%
     summarize(fdr_act = 100*mean(fdp), fdr_max = 100*mean(fdrmax)
       , fdr_max2 = 100*mean(fdrmax2)) %>% 
     pivot_longer(cols = starts_with('fdr')) %>% 
