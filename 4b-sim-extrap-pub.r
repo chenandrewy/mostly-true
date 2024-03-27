@@ -146,7 +146,7 @@ rbind(
 edge = seq(-1,1,0.05)
 plotme = cdat %>% 
   group_by(group) %>% 
-  summarise(cmid = hist(c,edge)$mids, density = hist(c,edge)$density) %>% 
+  summarise(cmid = hist(c,edge,plot=F)$mids, density = hist(c,edge,plot=F)$density) %>% 
   mutate(
     group = factor(
       group

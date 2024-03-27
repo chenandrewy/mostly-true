@@ -104,11 +104,12 @@ setDT(storeydat)
 
 # find FDRs
 tmin = 2
-F_null = function(tmin) 2*(1-pnorm(tmin))
+# F_null = function(tmin) 2*(1-pnorm(tmin)) # better to use the ez 5% for consistency
+F_null_ez = 0.05
 tabdat = regest[ , .(Pr_gt_tmin = mean(abs(tstat) > tmin)), by = c('sweight','model')] %>% 
     left_join(storeydat, by = c('sweight','model')) %>% 
-    mutate(FDRmax = F_null(tmin)/Pr_gt_tmin*pFmax
-        , FDRmaxez = F_null(tmin)/Pr_gt_tmin) %>% 
+    mutate(FDRmax = F_null_ez/Pr_gt_tmin*pFmax
+        , FDRmaxez = F_null_ez/Pr_gt_tmin) %>% 
     as_tibble() %>% 
     arrange(tmax, sweight, model) 
 
