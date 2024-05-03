@@ -229,28 +229,25 @@ load('../data/deleteme-sim-theory-free.RData')
 
 # Exhibits --------------------------------------------------------
 
-## Figure of fdr actual vs bound w/ storey ====
 plotme = simdat %>% group_by(pF,mutrue) %>% 
-    mutate(pF = 100*pF) %>%
-    summarize(fdr_act = 100*mean(fdp), fdr_max = 100*mean(fdrmax)
-      , fdr_max2 = 100*mean(fdrmax2)) %>% 
-    pivot_longer(cols = starts_with('fdr')) %>% 
-    mutate(name=factor(
-      name
-      # , levels = c('fdr_max', 'fdr_max2', 'fdr_act')
-      # , labels = c('Easy Upper Bound', 'Storey Bound','Actual')
-      , levels = c('fdr_act', 'fdr_max2', 'fdr_max')
-      , labels = c('Actual', 'Storey Bound', 'Easy Upper Bound')
-    ))
+  mutate(pF = 100*pF) %>%
+  summarize(fdr_act = 100*mean(fdp), fdr_max = 100*mean(fdrmax)
+            , fdr_max2 = 100*mean(fdrmax2)) %>% 
+  pivot_longer(cols = starts_with('fdr')) %>% 
+  mutate(name=factor(
+    name
+    , levels = c('fdr_act', 'fdr_max2', 'fdr_max')
+    , labels = c('Actual', 'Visual Bound', 'Easy Bound')
+  ))
 
 # reordering legend (but preserving plotting order)
 # https://stackoverflow.com/questions/50420205/how-to-reorder-overlaying-order-of-geoms-but-keep-legend-order-intact-in-ggplot
-plotme$id2 = factor(plotme$name, levels = c('Easy Upper Bound', 'Storey Bound', 'Actual'))
+plotme$id2 = factor(plotme$name, levels = c('Easy Bound', 'Visual Bound', 'Actual'))
 
 # loop over mutrue values
 mutrue_list = unique(plotme$mutrue)
 for (mutruei in mutrue_list){  
-
+  
   plt = plotme %>% 
     filter(mutrue == mutruei) %>% 
     ggplot(aes(x=pF, y=value, group=name)) +
@@ -258,33 +255,37 @@ for (mutruei in mutrue_list){
     geom_hline(yintercept=100, color='gray50') +    
     # plot FDR and bounds
     geom_line(aes(linetype = name, color=name), size = 1.2) +
-    scale_color_manual(values=c('Easy Upper Bound'='gray60', 'Storey Bound'=MATBLUE, 'Actual'=MATRED)
-      , breaks=levels(plotme$id2)) +
-    scale_linetype_manual(values = c('Easy Upper Bound'='dotdash', 'Storey Bound'='31', 'Actual'='solid')
-      , breaks=levels(plotme$id2)) +
+    scale_color_manual(values=c('Easy Bound'='gray60'
+                                , 'Visual Bound'=MATBLUE, 'Actual'=MATRED)
+                       , breaks=levels(plotme$id2)
+                       , name=NULL) +
+    scale_linetype_manual(values = c('Easy Bound'='dotdash'
+                                     , 'Visual Bound'='31', 'Actual'='solid')
+                          , breaks=levels(plotme$id2)
+                          , name=NULL) +
     theme_minimal() +
     theme(
       text = element_text(family = "Palatino Linotype")
-      , axis.title = element_text(size = 12)
-      , axis.text = element_text(size = 10)      
-      , legend.title = element_blank()
-      , legend.text = element_text(size = 10)
+      # , axis.title = element_text(size = 12)
+      # , axis.text = element_text(size = 10)      
+      # , legend.title = element_blank()
+      # , legend.text = element_text(size = 8)
       , legend.key.size = unit(0.1, 'cm')
-      , legend.position = c(30,75)/100
+      , legend.position = c(20,80)/100
       , legend.key.width = unit(1,'cm')    
-      # , legend.spacing.y = unit(0.5, 'cm')
+      , legend.spacing.y = unit(0.5, 'cm')
       , legend.background = element_rect(colour = 'white', fill = 'white')    
       , panel.grid.minor = element_blank()
     ) +
     labs(
-      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
+      x = TeX('Proportion False Overall $Pr(F_d)$ (%)')
       , y = TeX('$FDR_{|t|>2}$ (%)')
     ) +
     coord_cartesian(ylim = c(0, 100)) 
   
   ggsave(
-    paste0('../results/sim-dm-storey-',mutruei,'.pdf'), plt, width = 8, height = 4
-    , scale = 0.6, device = cairo_pdf
+    paste0('../results/sim-dm-visual-',mutruei,'.pdf'), plt, width = 5, height = 2.5
+    , scale = 1, device = cairo_pdf
   )
 } # for mutruei
 

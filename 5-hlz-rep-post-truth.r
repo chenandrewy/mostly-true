@@ -209,74 +209,91 @@ p4 = p3 +
 
 ggsave('../results/slow-4.pdf', width = 12, height = 8, device =cairo_pdf)
 
-p5 = p4 +  
+p4b = p4 + 
   annotate(geom="text", 
            label="FDR = 1%", 
            x=3, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATRED
-  ) +
+  ) 
+ggsave('../results/slow-4b.pdf', width = 12, height = 8, device =cairo_pdf)
+
+p5 = p4b +
   annotate("rect", xmin = 3, xmax = 3.5, 
            ymin = -10, ymax = 5, size=2,
-           color='orange', fill=NA) +
+           color='red', fill=NA) +
   annotate("segment", x=4.2, xend=3.5,
            y=12, yend=5, size=2,
-           color='orange',
+           color='red',
            arrow=arrow(type = "closed", 
-                       length = unit(0.2, "inches"))) 
+                       length = unit(0.2, "inches"))) + 
   annotate("text", x=39/10, y=20, hjust=0,
-           color='orange', size=7,
+           color='red', size=7,
            label='False Discoveries', family = "Palatino Linotype") 
 
 ggsave('../results/slow-5.pdf', width = 12, height = 8, device =cairo_pdf)
 
 # plot FDR 5% line ------------------------------------------------------------
-p6 = p5 + 
-  geom_vline(xintercept = 2.27, size = linesize, color=MATYELLOW
-             , linetype='longdash') 
+
+# show just FDR 1% line w/ label
+p6 = p3 +
+  geom_vline(xintercept = hurdle_01, size = linesize, color = MATRED, linetype = 'dotdash') +  
+  annotate(geom="text", 
+           label="FDR = 1%", 
+           x=3, y=texty, vjust=-1, 
+           family = "Palatino Linotype", angle = 90, size = textsize, color = MATRED
+  ) 
 
 ggsave('../results/slow-6.pdf', width = 12, height = 8, device =cairo_pdf)
 
-p7 = p6 +
+
+p7 = p6  + 
+  geom_vline(xintercept = 2.27, size = linesize, color=MATYELLOW
+             , linetype='longdash') +
   annotate(geom="text", label="FDR = 5%", 
            x=2.40, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATYELLOW
-  ) + 
+  ) 
+
+ggsave('../results/slow-7.pdf', width = 12, height = 8, device =cairo_pdf)
+
+p7b = p7 + 
   annotate("rect", xmin = 2.3, xmax = 3.5, 
            ymin = -10, ymax = 5, size=2,
-           color='orange', fill=NA) +
+           color='red', fill=NA) +
   annotate("segment", x=4.2, xend=3.5,
            y=12, yend=5, size=2,
-           color='orange',
+           color='red',
            arrow=arrow(type = "closed", 
                        length = unit(0.2, "inches")))+
   annotate("text", x=39/10, y=20, hjust=0,
-           color='orange', size=7,
+           color='red', size=7,
            label='False Discoveries', family = "Palatino Linotype")
 
-ggsave('../results/slow-7.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave('../results/slow-7b.pdf', width = 12, height = 8, device =cairo_pdf)
 
 # plot classical hurdle --------------------------------------------------------------
 
 p8 = p7  + 
-  geom_vline(xintercept = 1.96, size = linesize) 
+  geom_vline(xintercept = 1.96, size = linesize) +
+  annotate(geom="text", label="Classical Hurdle", 
+           x=1.95, y=texty, vjust=-1, 
+           family = "Palatino Linotype", angle = 90
+           , size = textsize, color = 'black'
+  )
 
 ggsave('../results/slow-8.pdf', width = 12, height = 8, device =cairo_pdf)
 
-p9 = p8 +
-  annotate(geom="text", label="FDR = 9%", 
-           x=1.95, y=texty, vjust=-1, 
-           family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
-  ) + 
+p9 = p8  + 
   annotate("rect", xmin = 2, xmax = 3.5, 
            ymin = -10, ymax = 5, size=2,
-           color='orange', fill=NA) +
+           color='red', fill=NA) +
   annotate("segment", x=4.2, xend=3.5,
            y=12, yend=5, size=2,
-           color='orange',
+           color='red',
            arrow=arrow(type = "closed", 
                        length = unit(0.2, "inches")))+
   annotate("text", x=39/10, y=20, hjust=0,
-           color='orange', size=7,
+           color='red', size=7,
            label='False Discoveries', family = "Palatino Linotype")
 
 ggsave('../results/slow-9.pdf', width = 12, height = 8, device =cairo_pdf)

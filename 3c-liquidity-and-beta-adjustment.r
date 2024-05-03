@@ -1,15 +1,12 @@
-# 2024 03: to correct Harvey and Liu's (2020) errors in calculating the 
-# fraction of true strategies in Yan-Zheng 2017
-
+# Created 2024 03
 # Setup -----------------------------------------------------------------------
 
 rm(list = ls())
 source('0-functions.r')
 load('../data/emp_data.Rdata')
 
-
 # merge vw and ew data
-yz_ret1 = clz_ret %>% mutate(sweight = 'ew') %>%
+ret1 = clz_ret %>% mutate(sweight = 'ew') %>%
 rbind(
     clzvw_ret %>% mutate(sweight = 'vw') 
 ) %>% 
@@ -27,7 +24,7 @@ download.file("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_M
     , '../data/deleteme.zip')
 unzip('../data/deleteme.zip', exdir = '../data/')
 
-# read csvs and merge
+## read csvs and merge ====
 ff_fac = fread('../data/F-F_Research_Data_Factors.csv') %>% 
     left_join(fread('../data/F-F_Momentum_Factor.csv'), by = 'V1') 
 colnames(ff_fac) = c('yearm','mktrf','smb','hml','rf','mom')
@@ -40,13 +37,13 @@ ff_fac = ff_fac %>%
 
 # Find alphas (takes a couple minutes) ----------------------------------------
 
-yz_ret2 = copy(yz_ret1)
+ret2 = copy(ret1)
 
 # merge
-yz_ret2[ , c('year','month') := list(year(date), month(date))]
-yz_ret2[ff_fac, on = c('year','month')
+ret2[ , c('year','month') := list(year(date), month(date))]
+ret2[ff_fac, on = c('year','month')
     , `:=` (mktrf = i.mktrf, smb = i.smb, hml = i.hml, mom = i.mom, rf = i.rf)]
-yz_ret2[ , retrf := ret - rf]
+ret2[ , retrf := ret - rf]
 
 # define list of factor models
 #   ret is already a long-short so I shouldn't subtract rf (?)
@@ -64,7 +61,7 @@ print('Finding t-stats for model: ')
 for (modelstr in modelstrlist) {
     print(modelstr)
     modelform = as.formula(modelstr)
-    regest[[modelstr]] = yz_ret2[, list(
+    regest[[modelstr]] = ret2[, list(
         tstat = summary(lm(modelform, data = .SD))[['coefficients']]['(Intercept)', 't value']
     )
     , by = c('sweight','signalname')] %>% 
@@ -104,7 +101,7 @@ setDT(storeydat)
 
 # find FDRs
 tmin = 2
-# F_null = function(tmin) 2*(1-pnorm(tmin)) # better to use the ez 5% for consistency
+# Fnull = function(tmin) 2*(1-pnorm(tmin)) # better to use the ez 5% for consistency
 F_null_ez = 0.05
 tabdat = regest[ , .(Pr_gt_tmin = mean(abs(tstat) > tmin)), by = c('sweight','model')] %>% 
     left_join(storeydat, by = c('sweight','model')) %>% 
@@ -113,77 +110,41 @@ tabdat = regest[ , .(Pr_gt_tmin = mean(abs(tstat) > tmin)), by = c('sweight','mo
     as_tibble() %>% 
     arrange(tmax, sweight, model) 
 
-# export to latex -------------------------------------------------------------
+# Export, 'Visual' ----------------------------------------------------
+# just relabelling Storey as visual for clarity
 
 tmaxselect = 0.5
 
 # make pretty
 tab = tabdat %>% 
-    filter(tmax == tmaxselect) %>% 
-    filter(model != 'Raw') %>% 
-    select(sweight, model
-        , Pr_gt_tmin, FDRmaxez
-        , Pr_lt_tmax, pFmax,  FDRmax) %>% 
-    pivot_longer(cols = -c(sweight, model)) %>% 
-    mutate(value = round(100*value, 1)) %>%
-    pivot_wider(names_from=c('sweight','model'), values_from=value) %>% 
-    mutate(name = case_when(
-        name == 'Pr_lt_tmax' ~ paste0('$\\Pr(|t|\\le', round(tmaxselect,1), ')$ (\\%)')
-        , name == 'pFmax' ~ '$\\Pr(F)$ max (\\%)'
-        , name == 'Pr_gt_tmin' ~ paste0('$\\Pr(|t|>', tmin, ')$ (\\%)')
-        , name == 'FDRmax' ~ '$\\FDRez$ Storey Bound (\\%)'
-        , name == 'FDRmaxez' ~ '$\\FDRez$ Easy Bound (\\%)'
-    ))
-
-# export to latex
-library(kableExtra)
-tab %>% 
-    kable('latex', booktabs = T, linesep = '', escape = F, digits = 1
-    ) %>% 
-    cat(file='../results/temp.tex')
-
-# read in temp.tex and modify manually
-tex = readLines('../results/temp.tex') 
-tex[4] = ' & 1-Factor & 3-Factor & 4-Factor & 1-Factor & 3-Factor & 4-Factor \\\\'
-tex = tex %>% append('\\\\ \\hline', after=7)
-tex = tex  %>% append(' & \\multicolumn{3}{c}{Equal-Weighted}  & \\multicolumn{3}{c}{Value-Weighted} \\\\', after = 3) 
-
-writeLines(tex, con='../results/vw-ffn-storey.tex')
-
-# export to latex with raw ----------------------------------------------------
-
-tmaxselect = 0.5
-
-# make pretty
-tab = tabdat %>% 
-    filter(tmax == tmaxselect) %>% 
-    mutate(model = if_else(model=='Raw','0_Raw',model)) %>%
-    arrange(sweight,model) %>% 
-    select(sweight, model
-        , Pr_gt_tmin, FDRmaxez
-        , Pr_lt_tmax, pFmax,  FDRmax) %>% 
-    pivot_longer(cols = -c(sweight, model)) %>% 
-    mutate(value = round(100*value, 1)) %>%
-    pivot_wider(names_from=c('sweight','model'), values_from=value) %>% 
-    mutate(name = case_when(
-        name == 'Pr_lt_tmax' ~ paste0('$\\Pr(|t|\\le', round(tmaxselect,1), ')$ ')
-        , name == 'pFmax' ~ '$\\Pr(F)$ max '
-        , name == 'Pr_gt_tmin' ~ paste0('$\\Pr(|t|>', tmin, ')$ ')
-        , name == 'FDRmax' ~ '$\\FDRez$ max Storey'
-        , name == 'FDRmaxez' ~ '$\\FDRez$ max Easy'
-    ))
+  filter(tmax == tmaxselect) %>% 
+  mutate(model = if_else(model=='Raw','0_Raw',model)) %>%
+  arrange(sweight,model) %>% 
+  select(sweight, model
+         , Pr_gt_tmin, FDRmaxez
+         , Pr_lt_tmax, pFmax,  FDRmax) %>% 
+  pivot_longer(cols = -c(sweight, model)) %>% 
+  mutate(value = round(100*value, 1)) %>%
+  pivot_wider(names_from=c('sweight','model'), values_from=value) %>% 
+  mutate(name = case_when(
+    name == 'Pr_lt_tmax' ~ paste0('$\\Pr(|t|\\le', round(tmaxselect,1), ')$ ')
+    , name == 'pFmax' ~ '$\\Pr(F)$ max '
+    , name == 'Pr_gt_tmin' ~ paste0('$\\Pr(|t|>', tmin, ')$ ')
+    , name == 'FDRmax' ~ '$\\FDRez$ max Visual'
+    , name == 'FDRmaxez' ~ '$\\FDRez$ max Easy'
+  ))
 
 # add blank column
 tab2 = cbind(tab[ , 1:5]
-    , matrix('', nrow(tab), 1)
-    , tab[ , 6:9])
+             , matrix('', nrow(tab), 1)
+             , tab[ , 6:9])
 
 # export to latex
 library(kableExtra)
 tab2 %>% 
-    kable('latex', booktabs = T, linesep = '', escape = F, digits = 1
-    ) %>% 
-    cat(file='../results/temp.tex')
+  kable('latex', booktabs = T, linesep = '', escape = F, digits = 1
+  ) %>% 
+  cat(file='../results/temp.tex')
 
 # read in temp.tex and modify manually
 tex = readLines('../results/temp.tex') 
@@ -192,11 +153,9 @@ tex[5] = '\\cline{2-5} \\cline{7-10}'
 tex = tex %>% append('\\\\ \\cline{2-5} \\cline{7-10}', after=7)
 tex = tex  %>% append(' & \\multicolumn{4}{c}{Equal-Weighted}  & &  \\multicolumn{4}{c}{Value-Weighted} \\\\', after = 3) 
 
-writeLines(tex, con='../results/vw-ffn-storey-raw.tex')
+writeLines(tex, con='../results/vw-ffn-visual-raw.tex')
 
 
 
 
-
-
-
+    

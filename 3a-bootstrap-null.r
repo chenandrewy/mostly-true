@@ -5,13 +5,16 @@ rm(list=ls())
 source('0-functions.r')
 load('../data/emp_data.Rdata')
 
-ret = clz_ret %>% copy()
+## User ====
+nboot = 1000 # takes about 7 minutes on 4 cores
+ncores = 4
+min_obs_pct = 80 # minimum observations define sample
+
+ret = clz_ret %>% copy() # could use clz_vw or yz
+# ret = clzvw_ret %>% copy()
 
 # define sample period --------------------------------------------------------
 # tbc: unify with sim-theory-free
-
-# using minimum observations
-min_obs_pct = 80
 
 ret[ , yr := year(date)]
 obs_sum = ret[ , .(nobs = .N), by = c('yr', 'signalname')] %>% 
@@ -42,11 +45,7 @@ ret2[
 setkey(ret2, signalname, date)
 
 # bootstrap -------------------------------------------------------------------
-# for nboot = 1,000 takes about 7 minutes on 4 cores
-
-nboot = 1000
 nmonth = length(unique(ret2$date))
-ncores = 4
 
 datelist = unique(ret2$date)
 signallist = unique(ret2$signalname)
@@ -143,8 +142,9 @@ p = histdat_abs %>%
     ggplot(aes(x = tabsmid, y = value), size = 2) +
     geom_line(aes(color = name), size=0.5) +
     geom_point(aes(color = name, shape = name), size=3) +
+    labs(x = 'Absolute t-statistic', y = 'Probability') +
     scale_x_continuous(breaks = seq(-8, 20, 1)) +
-    coord_cartesian(xlim=c(0,5)) +
+    coord_cartesian(xlim=c(0,4)) +
     theme(
         axis.title = element_text(size = 12)
         , axis.text = element_text(size = 10)      
@@ -157,10 +157,10 @@ p = histdat_abs %>%
         , legend.background = element_rect(colour = 'black', fill = 'white')    
         , axis.line.x = element_line(color = 'black')
         , axis.line.y = element_line(color = 'black')
-    ) +
-    labs(x = 't-statistic', y = 'Probability') +
+    ) +    
     scale_color_manual(values=c(MATBLUE, MATRED), labels = lablist) +
     scale_shape_manual(values=c(1, 4), labels = lablist)
 
 
-ggsave('../results/boot-null-tabs.pdf', p, width = 10, height = 5, scale = 0.5)
+ggsave('../results/boot-null-tabs.pdf', p, width = 5, height = 2.5, scale = 1
+    , device = cairo_pdf)
