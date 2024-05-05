@@ -273,7 +273,7 @@ for (mutruei in mutrue_list){
       , legend.key.size = unit(0.1, 'cm')
       , legend.position = c(20,80)/100
       , legend.key.width = unit(1,'cm')    
-      , legend.spacing.y = unit(0.5, 'cm')
+      , legend.spacing.y = unit(0.001, 'cm')
       , legend.background = element_rect(colour = 'white', fill = 'white')    
       , panel.grid.minor = element_blank()
     ) +
