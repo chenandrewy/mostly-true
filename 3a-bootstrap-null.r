@@ -1,4 +1,5 @@
 # 2024 05 bootstrap check of the standard normal null
+# nboot = 1000 takes about 7 minutes on 4 cores
 
 # Setup -----------------------------------------------------------------------
 rm(list=ls())
@@ -6,7 +7,7 @@ source('0-functions.r')
 load('../data/emp_data.Rdata')
 
 ## User ====
-nboot = 1000 # takes about 7 minutes on 4 cores
+nboot = 1000 
 ncores = 4
 min_obs_pct = 80 # minimum observations define sample
 
@@ -49,7 +50,7 @@ nmonth = length(unique(ret2$date))
 
 datelist = unique(ret2$date)
 signallist = unique(ret2$signalname)
-histedge = c(-Inf, seq(-6, 6, 0.25), Inf)
+histedge = c(-Inf, seq(-6, 6, 0.50), Inf)
 
 # create bootstrap samples
 tic = Sys.time()
@@ -79,7 +80,11 @@ boothist = foreach(i = 1:nboot, .combine = rbind
     
     # compress to histogram frequencies
     temp = hist(tempsum$tstat, histedge, plot = FALSE)
-    temphist = data.table(tmid = temp$mids, f = temp$counts / sum(temp$counts))
+    temp2 = hist(abs(tempsum$tstat), histedge, plot = FALSE)
+    temphist = data.table(
+        tmid = temp$mids, tleft=histedge[-length(histedge)], tright=histedge[-1]
+        , f_t = temp$counts / sum(temp$counts), f_tabs = temp2$counts / sum(temp2$counts)
+    )
     temphist$booti = i
 
     # save
@@ -89,57 +94,55 @@ stopCluster(cl)
 print(paste0('done bootstrap in ', difftime(Sys.time(), tic, units = 'min')
     , ' minutes'))
 
-# plot tstat dist -----------------------------------------------------
+# summarize, add standard normal ----------------------------------------------
 
-# add standard normal
-histdat = boothist %>% 
-    group_by(tmid) %>% 
-    summarize(fboot = mean(f)) 
-histdat$tleft = histedge[-length(histedge)]    
-histdat$tright = histedge[-1]
-histdat = histdat %>% mutate(fnorm = pnorm(tright) - pnorm(tleft))
+# reshape
+boothistlong = melt(boothist, id.vars = c('tmid', 'tleft','tright','booti')
+    , measure.vars = c('f_t', 'f_tabs')
+    , variable.name = 'name', value.name = 'f') %>% 
+    mutate(name = ifelse(name == 'f_t', 'boot_t', 'boot_tabs'))
 
+# summarize
+histdat = boothistlong %>% 
+    group_by(tmid, tleft, tright, name) %>% 
+    summarize(f_mean = mean(f), f_low=quantile(f, 0.05), f_high=quantile(f, 0.95)) %>% 
+    ungroup() %>% 
+    arrange(desc(name), tmid) 
+
+# add normal
+histdat = histdat %>% mutate(fnorm = if_else(
+    name=='boot_t', pnorm(tright) - pnorm(tleft)
+    , (tmid>0)*2*(pnorm(tright) - pnorm(tleft))))
+
+# Plot tabs errorbars ---------------------------------------------------------
+
+# plot bar with errorbars
+p = histdat %>% filter(name == 'boot_tabs', tmid > 0) %>% 
+    ggplot(aes(x = tmid, y = f_mean)) +
+    # plot bootstrap
+    geom_bar(stat='identity', position='identity', aes(fill = name), alpha=1) +
+    geom_errorbar(aes(ymin = f_low, ymax = f_high), width = 0.1, color='black') +
+    scale_fill_manual(values = MATRED, labels = 'Bootstrap', name = NULL) +
+    # add normal
+    geom_line(aes(x = tmid, y = fnorm, color = name)) +
+    scale_color_manual(values = MATBLUE, labels = 'Normal(0,1)', name = NULL) +
+    labs(x = 'Absolute t-statistic', y = 'Probability') +
+    theme(legend.position = c(80,70)/100
+        , legend.title = element_blank()
+        , legend.margin = margin(t = -15, r = 20, b = 0, l = 5)) +
+    scale_x_continuous(breaks = seq(-6, 6, 1)) +
+    coord_cartesian(xlim=c(0, 1)*4) 
+
+ggsave('../results/boot-null-tabs-bar.pdf', p, width = 5, height = 2.5, scale = 1
+    , device = cairo_pdf)
+
+# plot simpler -----------------------------------------------------
 lablist = c('Bootstrap', 'Normal(0,1)')
 
-p = histdat %>% 
-    pivot_longer(cols = c('fboot', 'fnorm')) %>%
-    ggplot(aes(x = tmid, y = value)) +
-    geom_line(aes(color = name), size=0.5) +
-    geom_point(aes(color = name, shape = name), size=3) +
-    scale_x_continuous(breaks = seq(-8, 8, 1)) +
-    coord_cartesian(xlim=c(-1, 1)*4) +
-    theme(
-        axis.title = element_text(size = 12)
-        , axis.text = element_text(size = 10)      
-        , legend.title = element_blank()
-        , legend.text = element_text(size = 10)
-        , legend.key.size = unit(0.1, 'cm')
-        , legend.position = c(80,80)/100
-        , legend.key.width = unit(1,'cm')    
-        , legend.spacing.y = unit(0.000001, 'cm')
-        , legend.background = element_rect(colour = 'black', fill = 'white')    
-        , axis.line.x = element_line(color = 'black')
-        , axis.line.y = element_line(color = 'black')
-    ) +
-    labs(x = 't-statistic', y = 'Probability') +
-    scale_color_manual(values=c(MATBLUE, MATRED), labels = lablist) +
-    scale_shape_manual(values=c(1, 4), labels = lablist)
-
-ggsave('../results/boot-null-t.pdf', p, width = 5, height = 4, scale = 1, 
-    device = cairo_pdf)
-
-# plot abs(tstat) dist -----------------------------------------------------
-
-# calculate tabs dist
-histdat_abs = histdat %>% 
-    mutate(tabsmid = abs(tmid)) %>% 
-    arrange(tabsmid) %>% 
-    group_by(tabsmid) %>%
-    summarize(fboot = sum(fboot), fnorm = sum(fnorm)) 
-
-p = histdat_abs %>%
-    pivot_longer(cols = c('fboot', 'fnorm')) %>%
-    ggplot(aes(x = tabsmid, y = value), size = 2) +
+p = histdat %>% filter(name == 'boot_tabs', tmid > 0) %>%  
+    select(tmid, f_mean, fnorm) %>%
+    pivot_longer(cols=c('f_mean', 'fnorm')) %>% 
+    ggplot(aes(x = tmid, y = value), size = 2) +
     geom_line(aes(color = name), size=0.5) +
     geom_point(aes(color = name, shape = name), size=3) +
     labs(x = 'Absolute t-statistic', y = 'Probability') +
@@ -161,6 +164,6 @@ p = histdat_abs %>%
     scale_color_manual(values=c(MATBLUE, MATRED), labels = lablist) +
     scale_shape_manual(values=c(1, 4), labels = lablist)
 
-
 ggsave('../results/boot-null-tabs.pdf', p, width = 5, height = 2.5, scale = 1
     , device = cairo_pdf)
+
