@@ -1,4 +1,4 @@
-# 2022 05 10: simulation for yz data only
+# 2022 05 10: simulation for dm data
 
 # about 10 min for nsim = 1000
 
@@ -278,7 +278,7 @@ for (mutruei in mutrue_list){
       , panel.grid.minor = element_blank()
     ) +
     labs(
-      x = TeX('Proportion False Overall $Pr(F_d)$ (%)')
+      x = TeX('Proportion Null Overall $Pr(null_i)$ (%)')
       , y = TeX('$FDR_{|t|>2}$ (%)')
     ) +
     coord_cartesian(ylim = c(0, 100)) 

@@ -315,7 +315,7 @@ for (mutruei in mutrue_list){
       , panel.grid.minor = element_blank()
     ) +
     labs(
-      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
+      x = TeX('Proportion Null Overall $Pr(null_i)$ (%)')
       , y = TeX('$FDR_{|t|>2}$ (%)')
     ) +
     coord_cartesian(ylim = c(0, 100)) 
@@ -377,7 +377,7 @@ for (mutruei in mutrue_list){
       , panel.grid.minor = element_blank()
     ) +
     labs(
-      x = TeX('Proportion False Overall $Pr(F_i)$ (%)')
+      x = TeX('Proportion Null Overall $Pr(null_i)$ (%)')
       , y = TeX('$FDR_{|t|>2}$ (%)')
     ) +
     coord_cartesian(ylim = c(0, 100)) 

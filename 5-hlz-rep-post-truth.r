@@ -49,8 +49,8 @@ chen_theme =   theme_minimal() +
 # Simulate hlz ----------------------------------------------------------------
 
 # true / false labels (for v)
-label_true = 'True: [Exp Ret]>0'
-label_false =  'False: [Exp Ret]=0'
+label_true = 'Alt: [Exp Ret]>0'
+label_false =  'Null: [Exp Ret]=0'
 
 nport = 1e4
 nsim = 500
@@ -132,7 +132,6 @@ datsum = datsum %>%
 hurdle_05 = min(datsum$tselect_left[which(datsum$fdr_tselect_left < 5)])
 hurdle_01 = min(datsum$tselect_left[which(datsum$fdr_tselect_left < 1)])
 hurdle_bonf05 = qnorm(1-0.05/300/2) # assumes everything is published, as in HLZ's conclusion text
-
 
 # Plot setup ----------------------------------------------
 
@@ -245,7 +244,6 @@ p6 = p3 +
 
 ggsave('../results/slow-6.pdf', width = 12, height = 8, device =cairo_pdf)
 
-
 p7 = p6  + 
   geom_vline(xintercept = 2.27, size = linesize, color=MATYELLOW
              , linetype='longdash') +
@@ -335,8 +333,9 @@ ggsave('../results/post-truth-2.pdf', width = 12, height = 8, device =cairo_pdf)
 # Relabel using post-truth -----------------------------------------------------------------
 
 # label left of bonf as false
-lab_hlz_false = '"False": Insignificant'
-lab_hlz_true = '"True": Significant'
+lab_hlz_true = '"Alt": Significant'
+lab_hlz_false = '"Null": Insignificant'
+
 
 # post-truth labels
 small = small %>% 

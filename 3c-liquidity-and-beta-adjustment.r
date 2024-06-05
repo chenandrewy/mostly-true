@@ -110,8 +110,7 @@ tabdat = regest[ , .(Pr_gt_tmin = mean(abs(tstat) > tmin)), by = c('sweight','mo
     as_tibble() %>% 
     arrange(tmax, sweight, model) 
 
-# Export, 'Visual' ----------------------------------------------------
-# just relabelling Storey as visual for clarity
+# Export latex ----------------------------------------------------
 
 tmaxselect = 0.5
 
@@ -128,7 +127,7 @@ tab = tabdat %>%
   pivot_wider(names_from=c('sweight','model'), values_from=value) %>% 
   mutate(name = case_when(
     name == 'Pr_lt_tmax' ~ paste0('$\\Pr(|t|\\le', round(tmaxselect,1), ')$ ')
-    , name == 'pFmax' ~ '$\\Pr(F)$ max '
+    , name == 'pFmax' ~ '$\\Pr(\\nullt)$ max '
     , name == 'Pr_gt_tmin' ~ paste0('$\\Pr(|t|>', tmin, ')$ ')
     , name == 'FDRmax' ~ '$\\FDRez$ max Visual'
     , name == 'FDRmaxez' ~ '$\\FDRez$ max Easy'

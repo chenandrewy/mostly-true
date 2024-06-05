@@ -67,7 +67,7 @@ p1 = ggplot(plotme, aes(x=mids, y=dF)) +
   theme(
     legend.position = c(0.7, 0.7)
   ) +
-  xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
+  xlab(TeX('Absolute t-statistic')) +
   ylab('Number of Strategies') 
 
 ggsave('../results/dm-anim-1.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
@@ -75,9 +75,6 @@ ggsave('../results/dm-anim-1.pdf', scale = 1, height = 2.5, width = 5, device = 
 p2 = p1 + 
   # discovery line 
   geom_vline(xintercept = h_disc, color = MATRED) +
-  # annotate(geom='text', x=2.1, y=5400, hjust = 0
-  #   , label='Discoveries ->', color = MATRED) +
-  # write out intuition 
   geom_segment(aes(xend = 27/10, yend = 1000, x = 3.3, y = 2300),
     arrow = arrow(length = unit(0.03, "npc")),
     colour = "black", size = 0.1

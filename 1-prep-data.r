@@ -133,9 +133,58 @@ clzvw_sum = clzvw_ret %>%
 
 save(
   list = c(
-    'cz_ret','cz_sum', 'clz_ret', 'clz_sum', 'yz_ret', 'yz_sum'
-    , 'clzvw_ret', 'clzvw_sum'
+    'cz_ret','cz_sum', 'clz_ret', 'clz_sum', 'clzvw_ret', 'clzvw_sum'
     )
   , file = '../data/emp_data.Rdata'
 )
 
+
+# CHECK IF YZ DATA IS AVAILABLE ===
+
+if file.exists('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat'){
+  # import sas data
+  library(haven)
+  yzraw = read_sas('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat')
+  setDT(yzraw)
+
+  # clean
+  yzraw[ , signalname := paste0(transformation, '|', fsvariable)][
+    , date := DATE][
+    , c('DATE', 'transformation','fsvariable') := NULL]
+  
+  # separate
+  yz_ret = yzraw %>% transmute(date,signalname,ret=ddiff_ew)
+  yzvw_ret = yzraw %>% transmute(date,signalname,ret=ddiff_vw)
+
+  # summarize
+  yz_sum = yz_ret %>% 
+    group_by(signalname) %>% 
+    summarize(
+      rbar = mean(ret)
+      , vol = sd(ret)
+      , nmonth = n()
+      , traw = rbar/vol*sqrt(nmonth)
+      , tabs = abs(traw)
+    )
+  yzvw_sum = yzvw_ret %>% 
+    group_by(signalname) %>% 
+    summarize(
+      rbar = mean(ret)
+      , vol = sd(ret)
+      , nmonth = n()
+      , traw = rbar/vol*sqrt(nmonth)
+      , tabs = abs(traw)
+    )
+  
+  
+  ## SAVE TO DISK ====
+  save(
+    list = c(
+      'cz_ret','cz_sum'
+      , 'clz_ret', 'clz_sum', 'clzvw_ret', 'clzvw_sum'
+      , 'yz_ret', 'yz_sum', 'yzvw_ret', 'yzvw_sum'
+      )
+    , file = '../data/emp_data.Rdata'
+  )  
+
+}
