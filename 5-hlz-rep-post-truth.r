@@ -21,14 +21,6 @@ chen_theme =   theme_minimal() +
   theme(
     text = element_text(family = "Palatino Linotype")
     , panel.border = element_rect(colour = "black", fill=NA, size=1)
-    
-    # Font sizes
-    # , axis.title.x = element_text(size = 26),
-    # axis.title.y = element_text(size = 26),
-    # axis.text.x = element_text(size = 22),
-    # axis.text.y = element_text(size = 22),
-    # legend.text = element_text(size = 18),
-
     , axis.title.x = element_text(size = 30),
     axis.title.y = element_text(size = 30),
     axis.text.x = element_text(size = 26),
@@ -53,7 +45,7 @@ label_true = 'Alt: [Exp Ret]>0'
 label_false =  'Null: [Exp Ret]=0'
 
 nport = 1e4
-nsim = 500
+nsim = 1000
 n = nport*nsim
 
 set.seed(121)
@@ -72,6 +64,7 @@ sigc = sqrt(rho)
 sige = sqrt(1-sigc^2)
 
 # simulate common component (in blocks)
+simi = matrix(1:nsim, nrow = nsim, ncol = nport) %>% t() %>% as.vector
 c = matrix(rnorm(nsim, 0, sigc), nrow = nsim, ncol = nport) %>% t() %>% 
   as.vector
 # add idiosyncratic noise
@@ -88,7 +81,7 @@ Z = c + e
 
 # assemble into data table
 dat = data.table(
-  Z, theta, v, theta_scatter
+  simi, c, Z, theta, v, theta_scatter
 ) %>% 
   mutate(
     t = theta + Z
@@ -133,8 +126,7 @@ hurdle_05 = min(datsum$tselect_left[which(datsum$fdr_tselect_left < 5)])
 hurdle_01 = min(datsum$tselect_left[which(datsum$fdr_tselect_left < 1)])
 hurdle_bonf05 = qnorm(1-0.05/300/2) # assumes everything is published, as in HLZ's conclusion text
 
-# Plot setup ----------------------------------------------
-
+# Plot setup 
 # find a subset for plotting
 # nplot = 1500 # close to HLZ's estimate of "total factors" (ignoring unidentified scale)
 nplot = 1378 #  # Table 5, rho = 0.2, M
@@ -336,7 +328,6 @@ ggsave('../results/post-truth-2.pdf', width = 12, height = 8, device =cairo_pdf)
 lab_hlz_true = '"Alt": Significant'
 lab_hlz_false = '"Null": Insignificant'
 
-
 # post-truth labels
 small = small %>% 
   mutate(
@@ -467,7 +458,6 @@ p5 = ggplot(small, aes(x=tselect,y=mu_scatter))  +
 
 ggsave('../results/post-truth-5.pdf', width = 12, height = 8, device =cairo_pdf)  
 
-
 # Some numbers for the paper ---------------------------------------------------
 sig_share =  dat %>% filter(tabs>2) %>% summarize(sig_share = mean(tabs>2.27)) %>% 
   pull(sig_share)
@@ -492,8 +482,78 @@ small %>%
 
 -1*qnorm(0.05/296/2)
 
-
 dat %>% 
   summarize(
     sum((tabs<3.8)&(tabs>2))/sum(tabs>2) 
   )
+
+# HLZ Data Distribution --------------------------------------------------------
+
+# simulate pubs 
+dat2 = copy(dat)
+set.seed(124)
+dat2$pubnoise = runif(nrow(dat))
+dat2 = dat2 %>% 
+  mutate(pub = case_when(
+    tabs < 1.96 ~ FALSE
+    , tabs > 2.57 ~ TRUE
+    , TRUE ~ pubnoise < 0.5
+  ))
+
+# Hand collect desired hurdles
+# Holm is eyeballed (not listed in the text)
+hdat = tibble(
+  name = c('Bonferroni (FWER $\\le$ 5\\%)'
+    , 'Holm (FWER $\\le$ 5\\%)'
+    , 'BY Thm 1.3 (FDR $\\le$ 1\\%)'
+    , 'BY Thm 1.3 (FDR $\\le$ 5\\%)'
+    , 'SMM (FDR $=$ 5\\%)'
+    , 'SMM (FDR $=$ 1\\%)')
+  , hurdle = c(3.78, 3.60, 3.39, 2.81, 2.27, 2.95)
+  , pct_insig_hlz = c(158, 142, 132, 80, NA, NA)/296
+  , FDRmax = c(NA, NA, 0.01, 0.05, 0.05, 0.01)
+)
+
+# Construct distribution, rigorously
+for (hi in 1:nrow(hdat)){
+  if (hi==1){hdat$pct_insig=NA; hdat$n_insig=NA}
+  # take pct insig in each sim and then average across sims
+  # (doesn't really make a difference)
+  hdat$pct_insig[hi] =  dat2[pub==TRUE, ] %>% 
+    group_by(simi) %>% 
+    summarise(pct_insig = 100*mean(tabs < hdat$hurdle[hi])) %>%
+    ungroup() %>%
+    summarise(mean(pct_insig)) %>% pull()
+}
+hdat$n_insig = round(hdat$pct_insig/100 * 296)
+
+tab = hdat %>% arrange(hurdle) %>% 
+  mutate(pct_sig = 100-pct_insig
+    , FDRezmax = FDRmax*pct_sig + pct_insig) %>% 
+  mutate(across(c(pct_sig, pct_insig, FDRezmax), ~round(.,0))) %>%
+  select(hurdle, pct_sig, pct_insig, n_insig, name, FDRezmax)
+
+# export to latex
+library(kableExtra)
+tab %>% 
+  kable('latex', booktabs = T, linesep = '', escape = F, digits = 2
+  ) %>% 
+  cat(file='../results/temp.tex')
+
+# read in temp.tex and modify manually
+tex = readLines('../results/temp.tex') 
+# tex[4] = '$h$ & $\\Pr(|t_i|>h)$ & $\\Pr(|t_i|<h)$ & $\\#(|t_i|<h)$  & Description \\\\'
+# tex[4] = 'Hurdle & Prob  & Prob   & Number  & Description \\\\'
+tex[4] = '\\multirow{2}{*}{Hurdle} & \\multicolumn{1}{c}{Percent} & \\multicolumn{1}{c}{Percent} & \\multicolumn{1}{c}{Number} & \\multicolumn{1}{c}{Hurdle} & Implied $\\FDRez$ \\\\'
+tex = tex %>% 
+  append(' &\\multicolumn{1}{c}{Signif} & \\multicolumn{1}{c}{Insignif} & \\multicolumn{1}{c}{Insignif} & \\multicolumn{1}{c}{Description} & \\multicolumn{1}{c}{Bound (\\%)} \\\\'
+  , after = 4) 
+tex = tex %>% gsub('NA', '', .)
+
+writeLines(tex, con='../results/hlz-tdist.tex')
+
+
+
+# Numbers for paper
+0.05*0.72 + 0.28
+0.05*0.89 + 0.11
