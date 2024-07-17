@@ -2,7 +2,7 @@
 # Generate data for BH style FDR estimates 
 # makes '../data/emp_data.Rdata'
 
-# ENVIRONMENT ====
+# ENVIRONMENT -------------------------------
 
 rm(list = ls())
 source('0-functions.r')
@@ -16,7 +16,7 @@ pathRelease = 'https://drive.google.com/drive/folders/1O18scg9iBTiBaDiQFhoGxdn4F
 # this prompts a login
 pathRelease %>% drive_ls()
 
-# DOWNLOAD DATA =====
+# DOWNLOAD DATA -------------------------------
 
 # download monthly returns
 target_dribble = pathRelease %>% drive_ls() %>% 
@@ -32,9 +32,9 @@ target_dribble = pathRelease %>% drive_ls() %>%
 
 drive_download(target_dribble, path = '../data/SignalDoc.csv', overwrite = T)
 
-# PROCESS DATA ====
+# PROCESS DATA -------------------------------
 
-## import into R ====
+## import into R -------------------------------
 
 ret0 = fread('../data/PredictorPortsFull.csv') %>% 
   filter(port=='LS') %>% 
@@ -43,7 +43,7 @@ ret0 = fread('../data/PredictorPortsFull.csv') %>%
 header = fread('../data/SignalDoc.csv') %>% 
   rename(signalname=Acronym)
 
-## construct benchmark data ====
+## construct benchmark data -------------------------------
 # add sample info
 cz_ret = ret0 %>% 
   left_join(
@@ -65,9 +65,9 @@ cz_sum = cz_ret %>%
     , nmonth = n()
     , traw = rbar/vol*sqrt(nmonth)
     , tabs = abs(traw)
-  )
+  ) %>% setDT()
 
-# ADD CLZ DATA ====
+# ADD CLZ DATA -------------------------------
 # created 2023 12 
 # this can replace the yz data
 
@@ -85,7 +85,9 @@ temp0 = fread('../data/CLZ_raw.csv')
 clz_ret = temp0 %>% 
   mutate(date = paste(year, month, '28', sep = '-')
       , date = as.Date(date, format = '%Y-%m-%d')) %>% 
-  transmute(signalname = signalid, date, ret)
+  transmute(signalname = signalid, date, ret) %>% 
+  # filter for July 1963 or later
+  filter(date >= '1963-07-01')
 
 # repeatedly used summary stats (in-sample)
 clz_sum = clz_ret %>% 
@@ -96,9 +98,9 @@ clz_sum = clz_ret %>%
     , nmonth = n()
     , traw = rbar/vol*sqrt(nmonth)
     , tabs = abs(traw)
-  )
+  ) %>% setDT()
 
-# ADD CLZ VW DATA ====
+# ADD CLZ VW DATA -------------------------------
 # created 2024 03
 # trying to kick it up a notch
 
@@ -116,7 +118,9 @@ temp0 = fread('../data/CLZvw_raw.csv')
 clzvw_ret = temp0 %>% 
   mutate(date = paste(year, month, '28', sep = '-')
       , date = as.Date(date, format = '%Y-%m-%d')) %>% 
-  transmute(signalname = signalid, date, ret)
+  transmute(signalname = signalid, date, ret) %>% 
+  # filter for July 1963 or later
+  filter(date >= '1963-07-01')
 
 # repeatedly used summary stats (in-sample)
 clzvw_sum = clzvw_ret %>% 
@@ -127,9 +131,9 @@ clzvw_sum = clzvw_ret %>%
     , nmonth = n()
     , traw = rbar/vol*sqrt(nmonth)
     , tabs = abs(traw)
-  )  
+  ) %>% setDT()
 
-# SAVE TO DISK ====
+# SAVE TO DISK -------------------------------
 
 save(
   list = c(
@@ -141,7 +145,7 @@ save(
 
 # CHECK IF YZ DATA IS AVAILABLE ===
 
-if file.exists('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat'){
+if (file.exists('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat')){
   # import sas data
   library(haven)
   yzraw = read_sas('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat')
@@ -165,7 +169,7 @@ if file.exists('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat'){
       , nmonth = n()
       , traw = rbar/vol*sqrt(nmonth)
       , tabs = abs(traw)
-    )
+    ) %>% setDT()
   yzvw_sum = yzvw_ret %>% 
     group_by(signalname) %>% 
     summarize(
@@ -174,10 +178,9 @@ if file.exists('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat'){
       , nmonth = n()
       , traw = rbar/vol*sqrt(nmonth)
       , tabs = abs(traw)
-    )
+    ) %>% setDT()
   
-  
-  ## SAVE TO DISK ====
+  ## SAVE TO DISK -------------------------------
   save(
     list = c(
       'cz_ret','cz_sum'
@@ -187,4 +190,4 @@ if file.exists('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat'){
     , file = '../data/emp_data.Rdata'
   )  
 
-}
+} # end if yz data is availabl
