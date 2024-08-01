@@ -17,6 +17,9 @@ library(latex2exp)
 library(foreach)
 library(doParallel)
 
+# Global settings -----------------------------
+
+
 # STATS ====
 
 # truncated gamma moments
@@ -32,7 +35,6 @@ mom_trunc_gamma = function(shape,scale,tmin,ord=1){
   temp = integrate(intme,tmin,Inf)
   return = temp$value
 }
-
 
 # fit truncated gamma
 est_trunc_gamma = function(tabs, tgood, shape, ord=1){
@@ -53,9 +55,6 @@ est_trunc_gamma = function(tabs, tgood, shape, ord=1){
   return = est
   
 } # est_trunc_gamma
-
-
-
 
 # TOOLS ====
 
@@ -102,13 +101,10 @@ histcomp = function(
   grid.arrange(p1, p2, nrow=1)  
 } # end function
 
-
-
 # AESTHETICS ====
 
 library(latex2exp)
 library(extrafont)
-
 
 MATBLUE = rgb(0,0.4470,0.7410)
 MATRED = rgb(0.8500, 0.3250, 0.0980)
@@ -170,3 +166,73 @@ theme_set(
       text = element_text(family = "Palatino Linotype")
     )
 )
+
+# define bootstrap function -------------------------------
+bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr = "ret", min_obs_pct = 50, demean = TRUE, ncore = 1, output_cor = FALSE) {
+    # min_obs_pct = 80 starts in 1986, 50 starts in 1972
+
+    # convert to wide matrix
+    rmat <- dcast(ret, signalname ~ date, value.var = "ret") %>%
+        as.matrix()
+    row.names(rmat) <- rmat[, "signalname"]
+    rmat <- rmat[, -which(colnames(rmat) == "signalname")]
+
+    # define sample period ------------------------------------
+    # tbc: unify with sim-theory-free, sim-extrap-pub
+
+    obs_by_yearm <- colSums(!is.na(rmat), na.rm = TRUE) / nrow(rmat) * 100
+    col_ok <- which(obs_by_yearm > min_obs_pct)
+    col_ok <- min(col_ok):max(col_ok)
+    rmat <- rmat[, col_ok]
+
+    # de-mean -----------------------------------------------
+    if (demean){rmat <- rmat - rowMeans(rmat, na.rm=TRUE)}
+
+    # inner function for a single boot
+    bootstrap_once <- function() {
+        # sample dates (make this flexible)
+        tempdate <- sample(colnames(rmat), ncol(rmat), replace = TRUE) %>% sort()
+
+        # make bootstrapped panel
+        tempmat <- rmat[, tempdate]
+
+        # summary stats
+        tempmean <- rowMeans(tempmat, na.rm=T)
+        tempsd <- sqrt(rowMeans(tempmat^2, na.rm=T))
+        tempnmonth <- rowSums(!is.na(tempmat))
+        temptstat <- tempmean / tempsd * sqrt(tempnmonth)
+
+        # add correlations (in a slightly janky way)
+        tempcor <- rep(NA, length(temptstat))
+        if (output_cor) {
+          # if we sample 200 signals, we end up with 200*199/2 = 19900 correlations
+          tempid = sample(1:nrow(tempmat), 200, replace = FALSE)
+          tempcmat = cor(tempmat[tempid,] %>% t(), use='pairwise.complete.obs')
+          tempcorvec <- tempcmat[lower.tri(tempcmat)]
+          tempcor[1:length(tempcorvec)] <- tempcorvec
+        }
+        return(data.table(mean = tempmean, vol = tempsd, nmonth = tempnmonth,  corsamp = tempcor))
+    }
+
+    # bootstrap nboot times (in parallel or not)
+    if (ncore > 1) {
+        print(paste0('bootstrapping with ncore = ', ncore))
+
+        # set up cluster
+        cl <- makeCluster(ncore)
+        registerDoParallel(cl)
+        on.exit(stopCluster(cl))
+
+        bootdat <- foreach(booti = 1:nboot, .combine = rbind, .packages = c("data.table", "dplyr")) %dopar% {
+            print(paste0("bootstrapping ", booti, " of ", nboot))
+            bootstrap_once() %>% mutate(booti = booti)
+        }
+    } else {
+        bootdat <- foreach(booti = 1:nboot, .combine = rbind, .packages = c("data.table", "dplyr")) %do% {
+            print(paste0("bootstrapping ", booti, " of ", nboot))
+            bootstrap_once() %>% mutate(booti = booti)
+        }
+    }
+
+    return(bootdat)
+} # end bootstrap_flex

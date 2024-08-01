@@ -1,6 +1,7 @@
 # 2022 05 10: simulation for cz data 
 
 # takes about 2 minutes for nsim = 200
+# this is just for the appendix now
 
 # Setup -----------------------------------------------------------------------
 rm(list=ls())
@@ -16,7 +17,7 @@ min_nsignal = 100
 
 # dimensions
 N = 1e4
-nsim = 200
+nsim = 1000
 ndate = 200
 weight_emp = 0.65 # 0.65  matches the cor dist well
 vol_noise = mean(cz_sum$vol)

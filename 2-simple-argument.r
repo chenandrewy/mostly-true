@@ -19,12 +19,14 @@ n_dm = length(clz_sum$tabs)
 
 # make data for plotting 
 edge = seq(0,10,0.5)
-plotme = make_dist_dat(F_dm, edge, n_dm, F_dm, edge, n_dm)
+plotme = make_dist_dat(F_dm, edge, n_dm, F_dm, edge, n_dm) %>% 
+  filter(group==1) %>% 
+  mutate(group = 'emp')
 
 # plot 
 plt = ggplot(plotme, aes(x=mids, y=dF)) +
   geom_bar(
-    data = plotme %>% filter(group ==1 )
+    data = plotme %>% filter(group == 'emp' )
     , stat = 'identity', position = 'identity', fill = 'gray'
     , aes(fill = group)
   ) +
@@ -56,11 +58,12 @@ ggsave('../results/dm-intuition.pdf', scale = 1, height = 2.5, width = 5, device
 
 ## plots for slides ====
 
+# label explicitly for clarity in talks
+lab_dat = 'Data: CLZ\'s 29,000 EW Returns'
+
 # data only
 p1 = ggplot(plotme, aes(x=mids, y=dF)) +
-  geom_bar(
-    data = plotme %>% filter(group ==1 )
-    , stat = 'identity', position = 'identity', fill = 'gray'
+  geom_bar(stat = 'identity', position = 'identity'
     , aes(fill = group)
   ) +
   coord_cartesian(xlim = c(0,8)) +
@@ -68,7 +71,8 @@ p1 = ggplot(plotme, aes(x=mids, y=dF)) +
     legend.position = c(0.7, 0.7)
   ) +
   xlab(TeX('Absolute t-statistic')) +
-  ylab('Number of Strategies') 
+  ylab('Number of Strategies') +
+  scale_fill_manual(values = c('gray'), labels = lab_dat, name = NULL)
 
 ggsave('../results/dm-anim-1.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 

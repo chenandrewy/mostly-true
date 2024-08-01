@@ -69,7 +69,7 @@ cz_sum = cz_ret %>%
 
 # ADD CLZ DATA -------------------------------
 # created 2023 12 
-# this can replace the yz data
+# this replaces the yz data
 
 # copy-paste from browser via Chen's website
 url_clz = 'https://drive.google.com/drive/folders/16RqeHNyU5gcqjRUvqSeOfQCxu_B2mfcZ'

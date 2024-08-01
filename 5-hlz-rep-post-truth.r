@@ -184,19 +184,19 @@ p2 =  ggplot(small, aes(x=tselect,y=mu_scatter)) +
 
 ggsave('../results/slow-2.pdf', width = 12, height = 8, device =cairo_pdf)
 
-p3 = p2 + chen_theme
-
-ggsave('../results/slow-3.pdf', width = 12, height = 8, device =cairo_pdf)
-
 # plot FDR 1% line --------------------------------------------------------
 
-p4 = p3 +
-  geom_vline(xintercept = hurdle_01, size = linesize, color = MATRED, linetype = 'dotdash') +  
+p3 = p2 +
+  geom_vline(xintercept = hurdle_01, size = linesize, color = MATRED, linetype = 'dotdash') +
   annotate(geom="text", 
            label="Discoveries ->", 
            x=3+1.1, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 0, size = textsize, color = 'black'
   ) 
+
+ggsave('../results/slow-3.pdf', width = 12, height = 8, device =cairo_pdf)
+
+p4 = p3 +  chen_theme
 
 ggsave('../results/slow-4.pdf', width = 12, height = 8, device =cairo_pdf)
 
@@ -227,6 +227,7 @@ ggsave('../results/slow-5.pdf', width = 12, height = 8, device =cairo_pdf)
 
 # show just FDR 1% line w/ label
 p6 = p3 +
+  chen_theme +
   geom_vline(xintercept = hurdle_01, size = linesize, color = MATRED, linetype = 'dotdash') +  
   annotate(geom="text", 
            label="FDR = 1%", 
@@ -292,7 +293,8 @@ ggsave('../results/slow-9.pdf', width = 12, height = 8, device =cairo_pdf)
 
 # Start with 3 lines chart -------------------------------------------------------
 
-q1 = p3 +
+q1 = p2 +
+  chen_theme +
   geom_vline(xintercept = hurdle_01, size = linesize, color = MATRED, linetype = 'dotdash')+  
   annotate(geom="text", 
            label="FDR = 1%", 
@@ -306,7 +308,7 @@ q1 = p3 +
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATYELLOW
   ) + 
   geom_vline(xintercept = 1.96, size = linesize) +
-  annotate(geom="text", label="FDR = 9%", 
+  annotate(geom="text", label="Classical Hurdle", 
            x=1.95, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
   ) 
@@ -380,7 +382,7 @@ q2 = ggplot(small, aes(x=tselect,y=mu_scatter)) +
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATYELLOW
   ) + 
   geom_vline(xintercept = 1.96, size = linesize) +
-  annotate(geom="text", label="FDR = 9%", 
+  annotate(geom="text", label="Classical Hurdle", 
            x=1.95, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
   )  + 
@@ -443,7 +445,7 @@ p5 = ggplot(small, aes(x=tselect,y=mu_scatter))  +
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATYELLOW
   ) + 
   geom_vline(xintercept = 1.96, size = linesize) +
-  annotate(geom="text", label="FDR = 9%", 
+  annotate(geom="text", label="Classical Hurdle", 
            x=1.95, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
   )   + 
