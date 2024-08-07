@@ -9,7 +9,7 @@ load('../data/emp_data.Rdata')
 set.boot = list(
   nboot = 1000,
   min_obs_pct = 50,
-  ncore = 3
+  ncore = 8
 )
 
 ret = clz_ret

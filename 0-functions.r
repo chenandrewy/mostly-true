@@ -170,8 +170,10 @@ theme_set(
 # define bootstrap function -------------------------------
 bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr = "ret", min_obs_pct = 50, demean = TRUE, ncore = 1, output_cor = FALSE) {
     # min_obs_pct = 80 starts in 1986, 50 starts in 1972
-
+    
     # convert to wide matrix
+    ret = ret %>% select(all_of(c(coli, colt, colr)))
+    colnames(ret) = c('signalname','date','ret')
     rmat <- dcast(ret, signalname ~ date, value.var = "ret") %>%
         as.matrix()
     row.names(rmat) <- rmat[, "signalname"]
@@ -198,7 +200,7 @@ bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr 
 
         # summary stats
         tempmean <- rowMeans(tempmat, na.rm=T)
-        tempsd <- sqrt(rowMeans(tempmat^2, na.rm=T))
+        tempsd <- sqrt(rowMeans(tempmat^2, na.rm=T)-tempmean^2)
         tempnmonth <- rowSums(!is.na(tempmat))
         temptstat <- tempmean / tempsd * sqrt(tempnmonth)
 
@@ -236,3 +238,32 @@ bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr 
 
     return(bootdat)
 } # end bootstrap_flex
+
+# function for turning bootstrap results into a histogram
+histogram_by_group = function(bootact, edge, varname = 'tstat', group = 'booti') {
+
+  bootact = bootact %>% select(all_of(c(group, varname)))
+  colnames(bootact) = c('booti', 'xvar')
+
+  boothist = bootact %>%
+    # histogram counts within each bootstrap
+    mutate(bin = cut(xvar, breaks = edge, include.lowest = TRUE)) %>%
+    group_by(booti, bin) %>%
+    summarize(count = n(), .groups = 'drop')  %>% 
+    # normalize by total signals
+    left_join(bootact %>% group_by(booti) %>% summarize(ntotal=n()), by = "booti") %>% 
+    # find bin midpoints 
+    mutate(bin = str_remove_all(bin, "[\\(\\)\\[\\]]")
+        , left = str_split(bin, ",")
+        , left = sapply(left, function(x) as.numeric(x[1]))
+        , right = str_split(bin, ",")
+        , right = sapply(right, function(x) as.numeric(x[2]))
+        , mids = (left + right) / 2
+    ) %>% 
+    setDT()
+}
+
+unregister_dopar <- function() {
+  env <- foreach:::.foreachGlobals
+  rm(list=ls(name=env), pos=env)
+}
