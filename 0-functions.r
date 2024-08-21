@@ -180,8 +180,6 @@ bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr 
     rmat <- rmat[, -which(colnames(rmat) == "signalname")]
 
     # define sample period ------------------------------------
-    # tbc: unify with sim-theory-free, sim-extrap-pub
-
     obs_by_yearm <- colSums(!is.na(rmat), na.rm = TRUE) / nrow(rmat) * 100
     col_ok <- which(obs_by_yearm > min_obs_pct)
     col_ok <- min(col_ok):max(col_ok)
