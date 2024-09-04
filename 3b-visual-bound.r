@@ -134,7 +134,7 @@ plt <- ggplot(
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Strategies")
+  ylab("Number of Signals")
 
 ggsave("../results/dm-viz-axes-only.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
@@ -145,7 +145,7 @@ plt <- ggplot(plotme20min[group == "emp"], aes(x = mids, y = dF)) +
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Strategies") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,
@@ -165,7 +165,7 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null_small")], aes(x = mids, y = 
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Strategies") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,
@@ -184,7 +184,7 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Strategies") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,
@@ -226,7 +226,7 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null_ez")], aes(x = mids, y = dF)
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Strategies") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,
@@ -270,7 +270,7 @@ plt <- ggplot(plotme_err[group != "null_ez"], aes(x = mids, y = dF)) +
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Predictors") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,
@@ -307,16 +307,6 @@ plt <- ggplot(plotme_err[group != "null_ez"], aes(x = mids, y = dF)) +
       , "\\%$"
     ))
   )
-  
-  # old annotation with formulas
-  # annotate(
-  #   geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
-  #   label = TeX(paste0(
-  #     "FDR $\\leq \\frac{5\\%}{", round(Pr_disc, 2), "}$ (",
-  #     round(pFmax, 2), ") = ",
-  #     round(FDRmaxez * pFmax * 100, 0), "%"
-  #   ))
-  # )
 
 ggsave("../results/dm-viz-storey-err.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
@@ -326,7 +316,7 @@ plt <- ggplot(plotme_err[group != "null"], aes(x = mids, y = dF)) +
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Predictors") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,
@@ -364,16 +354,112 @@ plt <- ggplot(plotme_err[group != "null"], aes(x = mids, y = dF)) +
     ))
   )
 
-  # old annotation with formulas
-  # annotate(
-  #   geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
-  #   label = TeX(paste0(
-  #     "FDR $\\leq \\frac{5\\%}{", round(Pr_disc, 2), "}$ (1.00) = ",
-  #     round(FDRmaxez * 100, 0), "%"
-  #   ))
-  # )
-
 ggsave("../results/dm-viz-ez-err.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+
+
+# plot with error bars + bernoulli (for checking) ---------------------------------
+
+temp = plotme_err %>% 
+  mutate(se_bern = sqrt(dF/n_dm * (1 - dF/n_dm) / n_dm)*n_dm,
+    se_bern = ifelse(group=='emp',se_bern, NA),
+    dF_lo_bern = dF - se_bern,
+    dF_hi_bern = dF + se_bern)
+
+# plot storey null
+plt <- ggplot(temp[group != "null_ez"], aes(x = mids, y = dF)) +
+  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
+  scale_y_continuous(breaks = yticks) +
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX("Absolute t-statistic")) +
+  ylab("Number of Signals") +
+  # bars
+  geom_bar(
+    stat = "identity", position = "identity", alpha = bar_alpha,
+    aes(fill = group)
+  ) +
+  scale_fill_manual(
+    values = c(color_emp, color_null)
+    # , labels=c('Data', paste0('False = ', round(pFmax*100,0), '% of Data'))
+    , labels = c("Data: CLZ EW", paste0("Null Component Bound")),
+    name = ""
+  ) +
+  # error bars
+  geom_errorbar(aes(ymin = dF_lo, ymax = dF_hi), width = 0.15, color = "grey30", size = 0.3) +
+  # bernoulli error bars
+  geom_errorbar(aes(ymin = dF_lo_bern, ymax = dF_hi_bern), width = 0.15, color = "magenta", size = 0.3, linetype = "dashed") +
+  # discovery line
+  geom_vline(xintercept = h_disc, color = MATRED) +
+  annotate(
+    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
+    label = "Discoveries ->", color = MATRED
+  ) +
+  theme(legend.position = c(80, 80) / 100) +
+  # write out intuition
+  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
+    arrow = arrow(length = unit(0.03, "npc")),
+    colour = "black", size = 0.1
+  ) +
+  # annotate with SE
+  annotate(
+    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
+    label = TeX(paste0(
+      "FDR $\\leq "
+      , round(100*bootFDR$point[bootFDR$stat == "FDRmaxviz"], 1)
+      , " \\pm "
+      , round(100*bootFDR$boot_sd[bootFDR$stat == "FDRmaxviz"], 1)
+      , "\\%$"
+    ))
+  )
+
+ggsave("../results/dm-viz-storey-err-bern.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# plot ez null
+plt <- ggplot(temp[group != "null"], aes(x = mids, y = dF)) +
+  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
+  scale_y_continuous(breaks = yticks) +
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX("Absolute t-statistic")) +
+  ylab("Number of Signals") +
+  # bars
+  geom_bar(
+    stat = "identity", position = "identity", alpha = bar_alpha,
+    aes(fill = group)
+  ) +
+  scale_fill_manual(
+    values = c(color_emp, color_null)
+    # , labels=c('Data', paste0('False = ', round(pFmax*100,0), '% of Data'))
+    , labels = c("Data: CLZ EW", paste0("Null Component Bound")),
+    name = ""
+  ) +
+  # error bars
+  geom_errorbar(aes(ymin = dF_lo, ymax = dF_hi), width = 0.15, color = "grey30", size = 0.3) +
+  # discovery line
+  geom_vline(xintercept = h_disc, color = MATRED) +
+  annotate(
+    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
+    label = "Discoveries ->", color = MATRED
+  ) +
+  theme(legend.position = c(80, 80) / 100) +
+  # write out intuition
+  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
+    arrow = arrow(length = unit(0.03, "npc")),
+    colour = "black", size = 0.1
+  ) +
+  # annotate with SE
+  annotate(
+    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
+    label = TeX(paste0(
+      "FDR $\\leq "
+      , round(100*bootFDR$point[bootFDR$stat == "FDRmaxez"], 1)
+      , " \\pm "
+      , round(100*bootFDR$boot_sd[bootFDR$stat == "FDRmaxez"], 1)
+      , "\\%$"
+    ))
+  )
+
+ggsave("../results/dm-viz-ez-err-bern.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
 
 # plot with formulas ====
 
@@ -383,7 +469,7 @@ plt <- ggplot(plotme[group != "null_ez"], aes(x = mids, y = dF)) +
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Predictors") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,
@@ -423,7 +509,7 @@ plt <- ggplot(plotme[group != "null"], aes(x = mids, y = dF)) +
   coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
   scale_y_continuous(breaks = yticks) +
   xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Predictors") +
+  ylab("Number of Signals") +
   # bars
   geom_bar(
     stat = "identity", position = "identity", alpha = bar_alpha,

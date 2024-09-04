@@ -35,7 +35,7 @@ plt = ggplot(plotme, aes(x=mids, y=dF)) +
     legend.position = c(0.7, 0.7)
   ) +
   xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
-  ylab('Number of Strategies') +
+  ylab('Number of Signals') +
   # discovery line 
   geom_vline(xintercept = h_disc, color = MATRED) +
   annotate(geom='text', x=2.1, y=5400, hjust = 0
@@ -71,7 +71,7 @@ p1 = ggplot(plotme, aes(x=mids, y=dF)) +
     legend.position = c(0.7, 0.7)
   ) +
   xlab(TeX('Absolute t-statistic')) +
-  ylab('Number of Strategies') +
+  ylab('Number of Signals') +
   scale_fill_manual(values = c('gray'), labels = lab_dat, name = NULL)
 
 ggsave('../results/dm-anim-1.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
@@ -145,7 +145,7 @@ plt = ggplot(data = plotme, aes(x=mids, y=dF)) +
   scale_linetype_manual(values = groupdat$linetype, labels = groupdat$group, name = NULL)  +
   geom_vline(xintercept = h_disc) +
   xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
-  ylab('Number of Strategies') +
+  ylab('Number of Signals') +
   scale_x_continuous(
     breaks = seq(0,14,2)
   ) +
@@ -184,7 +184,7 @@ plt = ggplot(data = plotme, aes(x=mids, y=dF)) +
     values = MATBLUE, labels = 'Extrapolated', name = NULL
   ) +
   xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
-  ylab('Number of Strategies') +
+  ylab('Number of Signals') +
   scale_x_continuous(
     breaks = seq(0,14,2)
   ) +
