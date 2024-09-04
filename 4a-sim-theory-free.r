@@ -1,6 +1,6 @@
 # 2022 05 10: simulation for dm data
 
-# about 10 min for nsim = 1000
+# it's quite fast, the bootstrap is pre-computed
 
 # Setup -----------------------------------------------------------------------
 rm(list = ls())
@@ -42,6 +42,7 @@ library(foreach)
 library(dplyr)
 library(data.table)
 
+tic = Sys.time()
 ncore <- 3 # set the number of cores
 cl <- makeCluster(ncore)
 registerDoParallel(cl)
@@ -74,47 +75,8 @@ famstat = foreach(pari = 1:dim(parlist)[1], .combine = rbind, .packages = c("dpl
 } # for pari
 
 stopCluster(cl)
-
-
-
-# Simulate nsim times ---------------------------------------
-# simdat <- tibble()
-
-# for (simi in 1:nsim) {
-#   tic <- Sys.time()
-
-#   print(
-#     paste0("sim-theory-free: simi = ", simi, " nsim = ", nsim)
-#   )
-
-#   ## sim noise mat style ===
-#   dateselect <- sample(1:dim(emat)[1], ndate, replace = T)
-#   eboot <- emat[dateselect, ]
-
-#   cross0 <- tibble(
-#     signalid = 1:N,
-#     ebar = apply(eboot, 2, mean, na.rm = T),
-#     vol = apply(eboot, 2, sd, na.rm = T),
-#     ndate = apply(eboot, 2, function(x) sum(!is.na(x)))
-#   )
-
-#   toc <- Sys.time()
-#   print(toc - tic)
-# } # for simi
-# # calculate fdr
-# temp <- simdat %>%
-#   group_by(pari) %>%
-#   summarize(
-#     fdr = mean(fdp)
-#   )
-# simdat <- simdat %>%
-#   left_join(
-#     temp,
-#     by = "pari"
-#   )
-
-# # make dt
-# setDT(simdat)
+toc = Sys.time()
+print(paste0("Elapsed minutes: ", difftime(toc, tic, units = "mins")))
 
 
 # FIG: COR DIST --------------------------------------------
@@ -179,7 +141,7 @@ plt <- ggplot(
 ggsave(filename = "../results/cor-theory-free.pdf", width = 5, height = 4)
 
 
-# Exhibits --------------------------------------------------------
+# Plot for Paper --------------------------------------------------------
 
 plotme <- famstat %>%
   group_by(pF, mutrue) %>%
@@ -227,13 +189,9 @@ for (mutruei in mutrue_list) {
     ) +
     theme_minimal() +
     theme(
-      text = element_text(family = "Palatino Linotype")
-      # , axis.title = element_text(size = 12)
-      # , axis.text = element_text(size = 10)
-      # , legend.title = element_blank()
-      # , legend.text = element_text(size = 8)
-      , legend.key.size = unit(0.1, "cm"),
-      legend.position = c(20, 80) / 100,
+      text = element_text(family = "Palatino Linotype"),
+      legend.key.size = unit(0.1, "cm"),
+      legend.position = c(20, 70) / 100,
       legend.key.width = unit(1, "cm"),
       legend.spacing.y = unit(0.001, "cm"),
       legend.background = element_rect(colour = "white", fill = "white"),
@@ -247,6 +205,78 @@ for (mutruei in mutrue_list) {
 
   ggsave(
     paste0("../results/sim-dm-visual-", mutruei, ".pdf"), plt,
+    width = 5, height = 2.5,
+    scale = 1, device = cairo_pdf
+  )
+} # for mutruei
+
+
+# Plot for Short Slides --------------------------------------------------------
+# Omit Visual Bound for 25 min or less
+
+plotme <- famstat %>%
+  group_by(pF, mutrue) %>%
+  mutate(pF = 100 * pF) %>%
+  summarize(
+    fdr_act = 100 * mean(fdp), fdr_max = 100 * mean(fdrmax),
+    fdr_max2 = 100 * mean(fdrmax2)
+  ) %>%
+  pivot_longer(cols = starts_with("fdr")) %>%
+  mutate(name = factor(
+    name,
+    levels = c("fdr_act", "fdr_max2", "fdr_max"),
+    labels = c("Actual", "Visual Bound", "Easy Bound")
+  )) %>% 
+  filter(name != "Visual Bound")
+
+# reordering legend (but preserving plotting order)
+# https://stackoverflow.com/questions/50420205/how-to-reorder-overlaying-order-of-geoms-but-keep-legend-order-intact-in-ggplot
+plotme$id2 <- factor(plotme$name, levels = c("Easy Bound", "Visual Bound", "Actual"))
+
+# loop over mutrue values
+mutrue_list <- unique(plotme$mutrue)
+for (mutruei in mutrue_list) {
+  plt <- plotme %>%
+    filter(mutrue == mutruei) %>%
+    ggplot(aes(x = pF, y = value, group = name)) +
+    geom_hline(yintercept = 0, color = "gray50") +
+    geom_hline(yintercept = 100, color = "gray50") +
+    # plot FDR and bounds
+    geom_line(aes(linetype = name, color = name), size = 1.2) +
+    scale_color_manual(
+      values = c(
+        "Easy Bound" = "gray60",
+        "Visual Bound" = MATBLUE, "Actual" = MATRED
+      ),
+      breaks = levels(plotme$id2),
+      name = NULL
+    ) +
+    scale_linetype_manual(
+      values = c(
+        "Easy Bound" = "dotdash",
+        "Visual Bound" = "31", "Actual" = "solid"
+      ),
+      breaks = levels(plotme$id2),
+      name = NULL
+    ) +
+    theme_minimal() +
+    theme(
+      text = element_text(family = "Palatino Linotype"),
+      legend.key.size = unit(0.1, "cm"),
+      legend.position = c(20, 70) / 100,
+      legend.key.width = unit(1, "cm"),
+      legend.spacing.y = unit(0.001, "cm"),
+      legend.background = element_rect(colour = "white", fill = "white"),
+      panel.grid.minor = element_blank()
+    ) +
+    labs(
+      x = TeX("Proportion Null Overall $Pr(null_i)$ (%)"),
+      y = TeX("$FDR_{|t|>2}$ (%)")
+    ) +
+    coord_cartesian(ylim = c(0, 100))
+
+  ggsave(
+    paste0("../results/sim-dm-ez-only-", mutruei, ".pdf"), plt,
     width = 5, height = 2.5,
     scale = 1, device = cairo_pdf
   )
