@@ -116,6 +116,7 @@ plotme_err <- plotme %>%
 lab_dat <- "Data: CLZ's 29,000 EW Returns"
 
 discovery_y <- 11000
+textpos = c(1.7, 4000) # for cute text
 
 plotme20min <- plotme_err
 
@@ -140,7 +141,9 @@ ggsave("../results/dm-viz-axes-only.pdf", scale = 1, height = 2.5, width = 5, de
 
 # plot data only (need to introduce CLZ for short slides)
 # plotme20min[group!='null_ez'] %>% mutate(dF = if_else(group=='null',0,dF))
-plt <- ggplot(plotme20min[group == "emp"], aes(x = mids, y = dF)) +
+plt <- ggplot(plotme20min[group %in% c("emp", "null")] %>% 
+  mutate(dF = if_else(group=='null',0,dF)),
+  aes(x = mids, y = dF)) +
   coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
@@ -175,10 +178,17 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null_small")], aes(x = mids, y = 
     values = c(color_emp, color_null),
     labels = c(lab_dat, paste0("Null Component Bound: N(0,1)")),
     name = ""
+  ) +
+  # annotate text
+  annotate(
+    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
+    label = "X: Too small", color = MATRED,
+    family = "Comic Sans MS", fontface = "bold", size = 6
   )
+
 ggsave("../results/dm-viz-null-small.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
-# plot storey null
+# plot storey null (prelim first)
 plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
   coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
   scale_y_continuous(breaks = yticks) +
@@ -194,6 +204,14 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
     values = c(color_emp, color_null),
     labels = c(lab_dat, paste0("Null Component Bound: N(0,1)")),
     name = ""
+  ) 
+
+plt1 = plt +
+  # annotate text
+  annotate(
+    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
+    label = "Just Right =)", color = MATBLUE,
+    family = "Comic Sans MS", fontface = "bold", size = 6
   )
 
 ggsave("../results/dm-viz-storey-color-0.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
@@ -236,6 +254,12 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null_ez")], aes(x = mids, y = dF)
     values = c(color_emp, color_null),
     labels = c(lab_dat, paste0("Null Component Bound: N(0,1)")),
     name = ""
+  ) +
+  # annotate text
+  annotate(
+    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
+    label = "X: Too Large", color = MATRED,
+    family = "Comic Sans MS", fontface = "bold", size = 6
   )
 
 ggsave("../results/dm-viz-ez-color-0.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
