@@ -16,6 +16,7 @@ library(gridExtra)
 library(latex2exp)
 library(foreach)
 library(doParallel)
+library(extrafont)
 
 # Global settings -----------------------------
 

@@ -1,9 +1,10 @@
 # Setup -------------------------------------
 
 rm(list = ls())
-source("0-functions.r")
 load("../data/emp_data.Rdata")
 load("../data/bootact.Rdata")
+
+source("0-functions.r")
 
 # plot settings
 color_emp <- "gray50"
@@ -109,182 +110,6 @@ plotme_err <- plotme %>%
   left_join(boothist %>% select(group, mids, starts_with("dF_")),
     by = c("group", "mids")
   )
-
-# plots for slides ---------------------------------------
-
-# label explicitly for clarity in talks
-lab_dat <- "Data: CLZ's 29,000 EW Returns"
-
-discovery_y <- 11000
-textpos = c(1.7, 4000) # for cute text
-
-plotme20min <- plotme_err
-
-plotme20min <- plotme20min %>%
-  rbind(
-    plotme20min[group == "null"] %>%
-      mutate(dF = dF / 2, group = "null_small")
-  )
-
-# plot axes only
-plt <- ggplot(
-  plotme20min[group != "null_ez"] %>% mutate(dF = 0),
-  aes(x = mids, y = dF)
-) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals")
-
-ggsave("../results/dm-viz-axes-only.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot data only (need to introduce CLZ for short slides)
-# plotme20min[group!='null_ez'] %>% mutate(dF = if_else(group=='null',0,dF))
-plt <- ggplot(plotme20min[group %in% c("emp", "null")] %>% 
-  mutate(dF = if_else(group=='null',0,dF)),
-  aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, paste0("Null Component Bound: N(0,1)")),
-    name = ""
-  )
-
-ggsave("../results/dm-viz-data-only.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot a null that's too small
-plt <- ggplot(plotme20min[group %in% c("emp", "null_small")], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, paste0("Null Component Bound: N(0,1)")),
-    name = ""
-  ) +
-  # annotate text
-  annotate(
-    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
-    label = "X: Too small", color = MATRED,
-    family = "Comic Sans MS", fontface = "bold", size = 6
-  )
-
-ggsave("../results/dm-viz-null-small.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot storey null (prelim first)
-plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, paste0("Null Component Bound: N(0,1)")),
-    name = ""
-  ) 
-
-plt1 = plt +
-  # annotate text
-  annotate(
-    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
-    label = "Just Right =)", color = MATBLUE,
-    family = "Comic Sans MS", fontface = "bold", size = 6
-  )
-
-ggsave("../results/dm-viz-storey-color-0.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-plt2 <- plt +
-  # discovery line
-  geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(
-    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
-    label = "Discoveries ->", color = MATRED
-  ) +
-  theme(legend.position = c(70, 70) / 100) +
-  # write out intuition
-  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.1
-  ) +
-  annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
-    label = TeX(paste0(
-      "$FDR_{|t|>2}\\leq$ red / total = 9%"
-    ))
-  )
-
-ggsave("../results/dm-viz-storey-color.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot ez null
-plt <- ggplot(plotme20min[group %in% c("emp", "null_ez")], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, paste0("Null Component Bound: N(0,1)")),
-    name = ""
-  ) +
-  # annotate text
-  annotate(
-    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
-    label = "X: Too Large", color = MATRED,
-    family = "Comic Sans MS", fontface = "bold", size = 6
-  )
-
-ggsave("../results/dm-viz-ez-color-0.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-plt2 <- plt +
-  # discovery line
-  geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(
-    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
-    label = "Discoveries ->", color = MATRED
-  ) +
-  theme(legend.position = c(70, 70) / 100) +
-  # write out intuition
-  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.1
-  ) +
-  annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
-    label = TeX(paste0(
-      "$FDR_{|t|>2}\\leq$ red / total = 15%"
-    ))
-  )
-
-ggsave("../results/dm-viz-ez-color.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot with error bars -----------------------------------------
 
@@ -567,6 +392,184 @@ plt <- ggplot(plotme[group != "null"], aes(x = mids, y = dF)) +
   )
 
 ggsave("../results/dm-viz-ez.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# plots for slides ---------------------------------------
+
+# label explicitly for clarity in talks
+lab_dat <- "Data: CLZ's 29,000 EW Returns"
+lab_null <- "Null: Normal(0,1)"
+
+ylimnumslides = c(0, 8500)
+discovery_y <- 8000
+intuition_y <- 2800
+textpos = c(2.5, 3000) # for cute text
+
+## make plots ====
+
+# custom data for slides
+plotme20min <- plotme_err
+
+plotme20min <- plotme20min %>%
+  rbind(
+    plotme20min[group == "null"] %>%
+      mutate(dF = dF / 2, group = "null_small")
+  ) %>% 
+  rbind(
+    plotme20min[group == "null"] %>% 
+      mutate(dF = dF * 1.33, group = "null_large")
+  )
+
+# plot axes only
+plt <- ggplot(
+  plotme20min[group != "null_ez"] %>% mutate(dF = 0),
+  aes(x = mids, y = dF)
+) +
+  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
+  scale_y_continuous(breaks = yticks) +
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX("Absolute t-statistic")) +
+  ylab("Number of Signals")
+
+ggsave("../results/dm-viz-axes-only.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# plot data only (need to introduce CLZ for short slides)
+# plotme20min[group!='null_ez'] %>% mutate(dF = if_else(group=='null',0,dF))
+plt <- ggplot(plotme20min[group %in% c("emp", "null")] %>% 
+  mutate(dF = if_else(group=='null',0,dF)),
+  aes(x = mids, y = dF)) +
+  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
+  scale_y_continuous(breaks = yticks) +
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX("Absolute t-statistic")) +
+  ylab("Number of Signals") +
+  # bars
+  geom_bar(
+    stat = "identity", position = "identity", alpha = bar_alpha,
+    aes(fill = group)
+  ) +
+  scale_fill_manual(
+    values = c(color_emp, color_null),
+    labels = c(lab_dat, lab_null),
+    name = ""
+  )
+
+ggsave("../results/dm-viz-data-only.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# plot a null that's too small
+plt <- ggplot(plotme20min[group %in% c("emp", "null_small")], aes(x = mids, y = dF)) +
+  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
+  scale_y_continuous(breaks = yticks) +
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX("Absolute t-statistic")) +
+  ylab("Number of Signals") +
+  # bars
+  geom_bar(
+    stat = "identity", position = "identity", alpha = bar_alpha,
+    aes(fill = group)
+  ) +
+  scale_fill_manual(
+    values = c(color_emp, color_null),
+    labels = c(lab_dat, lab_null),
+    name = ""
+  ) 
+ggsave("../results/dm-viz-null-small-1.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)  
+
+plt1 = plt +
+  # annotate cute text
+  annotate(
+    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
+    label = "too small", color = MATRED,
+    family = "Arial", fontface = "bold", size = 5
+  )
+ggsave("../results/dm-viz-null-small-2.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# plot null that's too large
+plt <- ggplot(plotme20min[group %in% c("emp", "null_large")], aes(x = mids, y = dF)) +
+  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
+  scale_y_continuous(breaks = yticks) +
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX("Absolute t-statistic")) +
+  ylab("Number of Signals") +
+  # bars
+  geom_bar(
+    stat = "identity", position = "identity", alpha = bar_alpha,
+    aes(fill = group)
+  ) +
+  scale_fill_manual(
+    values = c(color_emp, color_null),
+    labels = c(lab_dat, lab_null),
+    name = ""
+  ) 
+ggsave("../results/dm-viz-null-large-1.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+plt1 = plt +
+  # annotate cute text
+  annotate(
+    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
+    label = "too large", color = MATRED,
+    family = "Arial", fontface = "bold", size = 5
+  )
+
+ggsave("../results/dm-viz-null-large-2.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# plot null that fits just right
+plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
+  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
+  scale_y_continuous(breaks = yticks) +
+  theme(legend.position = c(0.7, 0.7)) +
+  xlab(TeX("Absolute t-statistic")) +
+  ylab("Number of Signals") +
+  # bars
+  geom_bar(
+    stat = "identity", position = "identity", alpha = bar_alpha,
+    aes(fill = group)
+  ) +
+  scale_fill_manual(
+    values = c(color_emp, color_null),
+    labels = c(lab_dat, lab_null),
+    name = ""
+  ) 
+
+ggsave("../results/dm-viz-storey-color-1.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+plt1 = plt +
+  # annotate cute text
+  annotate(
+    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
+    label = "just right", color = MATBLUE,
+    family = "Arial", fontface = "plain", size = 5
+  )
+
+ggsave("../results/dm-viz-storey-color-2.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# remove cute text, add discovery line
+plt2 <- plt +
+  # discovery line
+  geom_vline(xintercept = h_disc, color = MATRED) +
+  annotate(
+    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
+    label = "Discoveries ->", color = MATRED
+  ) 
+
+ggsave("../results/dm-viz-storey-color-3.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# finally, add FDR text
+plt3 <- plt2 +
+  theme(legend.position = c(70, 70) / 100) +
+  # write out intuition
+  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
+    arrow = arrow(length = unit(0.03, "npc")),
+    colour = "black", size = 0.1
+  ) +
+  annotate(
+    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, 
+    label = TeX(paste0(
+      "$FDR_{|t|>2}\\leq$ red / total = 9%"
+    ))
+  )
+ggsave("../results/dm-viz-storey-color-4.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+
 
 # output table with boot results --------------------------------
 bootFDR_rounded <- bootFDR %>%

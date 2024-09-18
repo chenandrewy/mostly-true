@@ -129,7 +129,7 @@ groupdat = tibble(
   , linetype = c('solid', 'dashed')
 )
 
-# actual plot
+## actual plot ====
 plt = ggplot(data = plotme, aes(x=mids, y=dF)) +
   geom_bar(
     data = plotme %>% filter(group == 1)
@@ -168,7 +168,8 @@ clz_sum %>% filter(tabs>2.0) %>% summarize(mean_t_gt_2 = mean(tabs)) %>%
 
 ## plots for slides ====
 
-plt = ggplot(data = plotme, aes(x=mids, y=dF)) +
+# plot data only
+plt0 = ggplot(data = plotme, aes(x=mids, y=dF)) +
   geom_bar(
     data = plotme %>% filter(group == 1)
     , stat = 'identity', position = 'identity'
@@ -177,12 +178,6 @@ plt = ggplot(data = plotme, aes(x=mids, y=dF)) +
   scale_fill_manual(
     values = 'gray', labels = 'Published', name = NULL
   ) +  
-  geom_line(
-    data = plotme %>% filter(group %in% groupdat$group), aes(color = group)
-  ) +
-  scale_color_manual(
-    values = MATBLUE, labels = 'Extrapolated', name = NULL
-  ) +
   xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
   ylab('Number of Signals') +
   scale_x_continuous(
@@ -193,12 +188,35 @@ plt = ggplot(data = plotme, aes(x=mids, y=dF)) +
     , legend.margin = margin(t = -15, r = 20, b = 0, l = 5),
   ) +
   coord_cartesian(
-    xlim = c(0,8), ylim = c(0, 120)
+    xlim = c(0,8), ylim = c(0, 140)
   )
+
+ggsave('../results/hlz-intuition-0.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)  
+
+# add exponential extrapolation
+plt1 = plt0 + 
+  geom_line(
+    data = plotme %>% filter(group %in% c(2)), aes(color = group)
+  ) +
+  scale_color_manual(
+    values = MATBLUE, labels = 'Exponential w/ Mean = 2', name = NULL
+  ) 
 
 ggsave('../results/hlz-intuition-1.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
-plt2 = plt + 
+# add data-mined
+plt2 = plt0 + 
+  geom_line(
+    data = plotme %>% filter(group %in% c(2,3))
+    , aes(color = group, linetype = group)
+  ) +
+  scale_fill_manual(values = 'gray', labels = 'Published                ', name = NULL) +  
+  scale_color_manual(values = groupdat$color, labels = groupdat$group, name = NULL) +
+  scale_linetype_manual(values = groupdat$linetype, labels = groupdat$group, name = NULL)
+
+ggsave('../results/hlz-intuition-2.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+plt3 = plt + 
   geom_vline(xintercept = h_disc, color = MATRED) +
   # write out intuition  
   geom_segment(aes(xend = 2.75, yend = 13
@@ -212,5 +230,6 @@ plt2 = plt +
     , x = 42/10, y = 70
   )
 
-ggsave('../results/hlz-intuition-2.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave('../results/hlz-intuition-3.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
 
