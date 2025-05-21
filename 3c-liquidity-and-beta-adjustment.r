@@ -126,11 +126,11 @@ tab = tabdat %>%
   mutate(value = round(100*value, 1)) %>%
   pivot_wider(names_from=c('sweight','model'), values_from=value) %>% 
   mutate(name = case_when(
-    name == 'Pr_lt_tmax' ~ paste0('$\\Pr(|t|\\le', round(tmaxselect,1), ')$ ')
-    , name == 'pFmax' ~ '$\\Pr(\\nullt)$ max '
-    , name == 'Pr_gt_tmin' ~ paste0('$\\Pr(|t|>', tmin, ')$ ')
-    , name == 'FDRmax' ~ '$\\FDRez$ max Visual'
-    , name == 'FDRmaxez' ~ '$\\FDRez$ max Easy'
+    name == 'Pr_lt_tmax' ~ paste0('Share of $|t_i| <', round(tmaxselect,1), '$ ')
+    , name == 'pFmax' ~ '$\\Pr(\\nullt_i)$ Bound'
+    , name == 'Pr_gt_tmin' ~ paste0('Share of $|t_i| >', tmin, '$ ')
+    , name == 'FDRmax' ~ 'Visual Bound on $\\FDRez$'
+    , name == 'FDRmaxez' ~ 'Easy Bound on $\\FDRez$'
   ))
 
 # add blank column

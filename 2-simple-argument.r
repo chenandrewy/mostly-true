@@ -90,7 +90,7 @@ ggsave('../results/dm-anim-2.pdf', scale = 1, height = 2.5, width = 5, device = 
 
 # Extrapolated HLZ ------------------------------------------------------
 
-## define distributions
+## define distributions ====
 # empirical dist
 F_cz = ecdf(cz_sum$tabs)
 # hlz extrap
@@ -233,3 +233,90 @@ plt3 = plt +
 ggsave('../results/hlz-intuition-3.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 
+# Extrapolated, Accounting Predictors only ----------------------------
+
+# read signaldoc
+czdoc = fread('../data/SignalDoc.csv') %>% 
+    select(Acronym, Cat.Signal, Cat.Data) %>% 
+    filter(Cat.Signal == 'Predictor')
+
+# get data on published accounting predictors
+acct_signals = czdoc %>% filter(Cat.Data == 'Accounting') %>% pull(Acronym)
+acct_sum = cz_sum %>% filter(signalname %in% acct_signals)
+
+# estimate mean of exponential extrapolation
+mu_extrap = mean(acct_sum$tabs) - 2
+
+## define distributions ====
+# empirical dist
+F_cz = ecdf(acct_sum$tabs)
+# hlz extrap
+F_fit = function(tabs) pgamma(tabs, shape = 1, scale = mu_extrap)
+# data mined
+F_dm = ecdf(clz_sum$tabs)
+
+## make plotting data
+# define scaling
+n_cz = length(cz_sum$tabs)
+edge_cz = seq(0,10,0.5)
+edge_fit = seq(0,10,0.1)
+edge_dm = seq(0,10,0.5)
+
+# scaled data
+plotme1 = make_dist_dat(
+  F_cz, edge_cz, n_cz, F_fit, edge_fit, n_cz, x_match = c(3.0,Inf), showplot = T
+) 
+plotme2 = make_dist_dat(
+  F_cz, edge_cz, n_cz, F_dm, edge_dm, n_cz, x_match = c(3.0,Inf), showplot = F 
+) %>% 
+  filter(group==2) %>% 
+  mutate(group=3)
+plotme = plotme1 %>% rbind(plotme2) %>% 
+  mutate(group = factor(group, levels = c(1,2,3)
+  ))
+
+# numbers for annotations
+h_disc = 2
+Pr_disc = 1-F_fit(h_disc)
+fdrmax = 0.05/Pr_disc
+
+groupdat = tibble(
+  group = c('Exponential w/ Mean = 2.19','Data-Mined (CLZ)')
+  , color = c(MATBLUE, MATRED)
+  , linetype = c('solid', 'dashed')
+)
+
+## actual plot ====
+plt = ggplot(data = plotme, aes(x=mids, y=dF)) +
+  geom_bar(
+    data = plotme %>% filter(group == 1)
+    , stat = 'identity', position = 'identity'
+    , aes(fill = group)
+  ) +
+  geom_line(
+    data = plotme %>% filter(group %in% c(2,3))
+    , aes(color = group, linetype = group)
+  ) +
+  scale_fill_manual(values = 'gray', labels = 'Published Acct           ', name = NULL) +  
+  scale_color_manual(values = groupdat$color, labels = groupdat$group, name = NULL) +
+  scale_linetype_manual(values = groupdat$linetype, labels = groupdat$group, name = NULL)  +
+  geom_vline(xintercept = h_disc) +
+  xlab(TeX('Absolute t-statistic ($|t_i|$)')) +
+  ylab('Number of Signals') +
+  scale_x_continuous(
+    breaks = seq(0,14,2)
+  ) +
+  # discovery line
+  geom_vline(xintercept = h_disc, color = 'black') +
+  theme(
+    legend.position = c(70,60)/100
+    , legend.margin = margin(t = -15, r = 20, b = 0, l = 5),
+  ) +
+  coord_cartesian(
+    xlim = c(0,8), ylim = c(0, 150)
+  ) 
+
+ggsave('../results/extrap-acct.pdf', scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+
+# implied FDR bound
+5/exp(-2/mu_extrap)
