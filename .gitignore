@@ -42,3 +42,4 @@ vignettes/*.pdf
 # User
 data/
 *.csv
+*deleteme*

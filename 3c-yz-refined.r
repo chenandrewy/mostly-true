@@ -1,4 +1,4 @@
-# Setup -----------------------------------------------------------------------
+#%% Setup -----------------------------------------------------------------------
 
 rm(list = ls())
 source('0-functions.r')
@@ -12,7 +12,7 @@ rbind(
     select(sweight, signalname, date, ret) 
 setDT(ret1)
 
-## Download FF + Carhart factors ====
+## Download FF + Carhart factors 
 
 # Download FF3
 download.file("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip"
@@ -24,7 +24,7 @@ download.file("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_M
     , '../data/deleteme.zip')
 unzip('../data/deleteme.zip', exdir = '../data/')
 
-## read csvs and merge ====
+## read csvs and merge 
 ff_fac = fread('../data/F-F_Research_Data_Factors.csv') %>% 
     left_join(fread('../data/F-F_Momentum_Factor.csv'), by = 'V1') 
 colnames(ff_fac) = c('yearm','mktrf','smb','hml','rf','mom')
@@ -35,7 +35,7 @@ ff_fac = ff_fac %>%
     filter(!is.na(mktrf+smb+hml+mom)) %>% 
     select(year, month, mktrf, smb, hml, mom, rf)
 
-# Find alphas (takes a couple minutes) ----------------------------------------
+# Find alphas (takes a couple minutes) ===
 
 ret2 = copy(ret1)
 
@@ -73,7 +73,24 @@ regest = regest %>%
     mutate(pval = 2*(1-pnorm(abs(tstat)))) %>% 
     select(sweight, signalname, model, tstat, pval)
 
-# Calculate EZ FDR bound ------------------------------------------------------
+#%% Calculate Visual Bound ------------------------------------------------------
+
+regest2 = copy(regest)
+
+tab_viz = regest2 %>% 
+  group_by(sweight, model) %>% 
+  summarize(
+    Pr_tgt_2 = mean(abs(tstat) > 2)
+    , Pr_tlt_05 = mean(abs(tstat) < 0.5)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    FDRmax_ez = 0.05/Pr_tgt_2
+    , pFmax = Pr_tlt_05/0.38
+    , FDRmax_viz = FDRmax_ez*pFmax
+  )
+
+#%% Calculate Storey following HL ------------------------------------------------------
 
 regest2 = copy(regest)
 
@@ -84,35 +101,7 @@ regest2[ , Pr_pval2_lt_pval := (1:.N)/.N, by = c('sweight','model')]
 # Calculate EZ Bound
 regest2[ , FDR_ez := pval/Pr_pval2_lt_pval]
 
-# BY 1.3 Bound ----------------------------------------------------------------
-
-# find penalty
-temp = regest2 %>% 
-    group_by(sweight, model) %>%
-    summarize(penalty = sum(1/(1:n())), .groups = 'drop') 
-
-# merge on
-temp2 = merge(regest2, temp, by = c('sweight','model')) %>% 
-    mutate(FDRhat = FDR_ez * penalty) %>% 
-    group_by(sweight, model) 
-
-# find bounds for 5 and 10 percent FDRmax
-for (FDRmax in c(0.05, 0.10)) {
-    if(FDRmax == 0.05) tabout = data.table()
-    temp3 = temp2 %>% 
-        filter(FDRhat <= FDRmax) %>% 
-        filter(row_number() == n()) %>% 
-        mutate(pct_signif = 100*Pr_pval2_lt_pval
-            , pct_FDRmax = 100*FDRmax) %>% 
-        select(pct_FDRmax, sweight, model, pct_signif) %>% 
-        setDT()
-    tabout = rbind(tabout, temp3)
-}
-
-tab_BY13 = tabout
-rm(list = ls(pattern = "temp"))
-
-# Hand calculation of Storey --------------------------------------------------
+# Hand calculation of Storey ===
 
 # estimate pF
 temp1 =  regest2 %>%
@@ -144,63 +133,66 @@ tab_Storey = tabout %>%
         , by = c('sweight','model')) 
 rm(list = ls(pattern = "temp"))
 
-# Export latex ----------------------------------------------------
+#%% Export latex ----------------------------------------------------
 
-# rearrange
-tab_all = tab_Storey %>% mutate(meth = 'Storey') %>% 
-    bind_rows(
-        tab_BY13 %>% mutate(meth = 'BY1.3')
-    ) 
+# convert to long and bind
+temp1 = tab_viz %>% pivot_longer(cols = -c(sweight, model)) %>% 
+  mutate(value = value*100)
+temp2 = tab_Storey %>% select(-pct_alt) %>% pivot_wider(
+    id_cols = c(sweight, model), names_from = pct_FDRmax, values_from = pct_signif
+    , names_prefix = 'pct_signif_'
+    ) %>% 
+    pivot_longer(cols = -c(sweight, model)) 
+tab = temp1 %>% bind_rows(temp2)
 
-tab_signif = tab_all %>% 
-    filter(model!='Raw') %>% select(-pct_alt) %>% 
-    pivot_wider(names_from = c('sweight','model')
-        , values_from = c('pct_signif')) %>% 
-    arrange(pct_FDRmax, meth)
+# make the nice wide table
+stat_select = c('Pr_tgt_2', 'Pr_tlt_05'
+    , 'pFmax', 'FDRmax_viz'
+    ,'pct_signif_5', 'pct_signif_10')
+stat_label = c('Share of $|t_i| < 2.0$', 'Share of $|t_i| < 0.5$'
+    , '$\\Pr(\\nullt_i)$ Upper Bound', '$\\FDRez$ Upper Bound'
+    , 'FDR $\\le$ 5\\%', 'FDR $\\le$ 10\\%')
+model_select = c('CAPM', 'FF3', 'FF3+Mom')
 
-tab_alt = tab_all %>% 
-    filter(model!='Raw', pct_FDRmax==5, meth=='Storey') %>% 
-    select(-pct_signif) %>% 
-    pivot_wider(names_from = c('sweight','model')
-        , values_from = c('pct_alt')) %>% 
-    arrange(pct_FDRmax, meth) %>% 
-    mutate(pct_FDRmax = 'pct_alt')
-
-tab = tab_signif %>% rbind(tab_alt) 
-
-# add blank rows
-tab2 = bind_rows(
-    data.table(meth = 'pct_signif_05')
-    , tab[1:2,]
-    , data.table(meth = 'pct_signif_10')
-    , tab[3:4,]
-    , data.table(meth = 'pct_alt')
-    , tab[5, ]
-) %>% 
-select(-pct_FDRmax) 
+tabwide = tab %>% filter(name %in% stat_select
+    , model %in% model_select) %>% 
+    mutate(name = factor(name, levels = stat_select, labels = stat_label)
+        , model = factor(model, levels = model_select)) %>% 
+    arrange(sweight, model, name) %>% 
+    pivot_wider(names_from = c('sweight','model'), values_from = value) %>% 
+    print()
 
 # export to latex
 library(kableExtra)
-tab2 %>% 
+tabwide %>% 
   kable('latex', booktabs = T, linesep = '', escape = F, digits = 1
   ) %>% 
   cat(file='../results/temp.tex')
 
 # read in temp.tex and modify manually
 tex = readLines('../results/temp.tex') 
-tex[4] = ' & CAPM & FF3 & 4-fac & CAPM & FF3 & 4-fac \\\\'
-tex[6] = '\\multicolumn{7}{l}{Percent Significant (FDR $\\le$ 5\\%)} \\\\ \\cline{1-7}'
-tex[9] = '\\multicolumn{7}{l}{Percent Significant (FDR $\\le$ 10\\%)} \\\\ \\cline{1-7}'
-tex[12] = '\\multicolumn{7}{l}{Minimum Percent \`\`True Strategies\'\' (Non-Null)} \\\\ \\cline{1-7}'
 
-# replace names using grep
-tex = tex %>% gsub('BY1.3', 'BY 2001 Thm 1.3', .)  %>% 
-    gsub('Storey', 'Storey 2002', .)
+# add rows
+tex = tex %>% append('& \\multicolumn{3}{c}{Equal-Weighted}  &  \\multicolumn{3}{c}{Value-Weighted} \\\\', after = 3)
+tex = tex %>% append(paste(
+    "\\vspace{-1.5ex} \\\\ "
+    , "\\multicolumn{7}{l}{Panel (a): Visual Bound on $\\FDRez$}"
+    , "\\\\ \\midrule"
+    , sep = " "
+), after = 6)
+tex = tex %>% append(paste(
+    "\\\\"
+    , "\\multicolumn{7}{l}{Panel (b): Percent Significant using Storey (2002)}"
+    , "\\\\ \\midrule"
+    , sep = " "
+), after = 11)
 
-# add ew vw header
-tex = tex  %>% append(' & \\multicolumn{3}{c}{Equal-Weighted}  &  \\multicolumn{3}{c}{Value-Weighted} \\\\', after = 3) 
+# edit rows
+tex[5] = ' & CAPM & FF3 & 4-fac & CAPM & FF3 & 4-fac \\\\'
+tex[6] = '\\cline{2-7}'
 
-writeLines(tex, con='../results/hl-rep.tex')
+writeLines(tex, con='../results/yz-fdr.tex')
+
 
 
 
