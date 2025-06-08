@@ -3,7 +3,20 @@
 
 # setup ---------------------------
 rm(list = ls())
-source('0-functions.r')
+
+# Set working directory to unbreakable-bh folder
+if (basename(getwd()) != "unbreakable-bh") {
+  # Try to find unbreakable-bh directory
+  if (dir.exists("unbreakable-bh")) {
+    setwd("unbreakable-bh")
+  } else if (dir.exists("../unbreakable-bh")) {
+    setwd("../unbreakable-bh")  
+  } else {
+    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
+  }
+}
+
+source('functions.r')
 load('../data/emp_data.Rdata')
 
 set.boot = list(

@@ -1,6 +1,18 @@
 # 2021 08 Andrew
 # frequently used functions for bh with pub bias
 
+# Set working directory to unbreakable-bh folder
+if (basename(getwd()) != "unbreakable-bh") {
+  # Try to find unbreakable-bh directory
+  if (dir.exists("unbreakable-bh")) {
+    setwd("unbreakable-bh")
+  } else if (dir.exists("../unbreakable-bh")) {
+    setwd("../unbreakable-bh")  
+  } else {
+    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
+  }
+}
+
 # PATHS AND LIBRARIES ====
 
 dir.create('../data/', showWarnings = F)

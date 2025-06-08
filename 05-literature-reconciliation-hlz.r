@@ -1,6 +1,18 @@
 # Setup -------------------------------------------------------------------
 rm(list = ls())
 
+# Set working directory to unbreakable-bh folder
+if (basename(getwd()) != "unbreakable-bh") {
+  # Try to find unbreakable-bh directory
+  if (dir.exists("unbreakable-bh")) {
+    setwd("unbreakable-bh")
+  } else if (dir.exists("../unbreakable-bh")) {
+    setwd("../unbreakable-bh")  
+  } else {
+    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
+  }
+}
+
 # uncomment for pretty fonts
 # install.packages('extrafont')
 # extrafont::font_import()
