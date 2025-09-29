@@ -14,7 +14,7 @@ if (basename(getwd()) != "unbreakable-bh") {
   }
 }
 
-source("0-functions.r")
+source("functions.r")
 load("../data/emp_data.Rdata")
 load("../data/bootact.Rdata")
 
