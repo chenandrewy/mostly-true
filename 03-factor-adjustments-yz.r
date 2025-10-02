@@ -172,7 +172,7 @@ stat_select = c('Pr_tgt_2', 'Pr_tlt_1'
     ,'h_HL', 'pct_signif_HL')
 stat_label = c('Share of $|t_i| > 2.0$', 'Share of $|t_i| < 1.0$'
     , '$\\Pr(\\nullt_i)$ Upper Bound', '$\\FDRez$ Upper Bound'
-    , '$t$-statistic Hurdle', 'Percent Significant')
+    , '$t$-statistic Hurdle $h$', 'Percent Significant')
 model_select = c('CAPM', 'FF3', 'FF3+Mom')
 
 tabwide = tab %>% filter(name %in% stat_select
