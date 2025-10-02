@@ -138,11 +138,14 @@ for (FDRmax in c(0.05, 0.10)) {
         filter(FDRhat <= FDRmax) %>% 
         filter(row_number() == n()) %>% 
         mutate(pct_signif = 100*Pr_pval2_lt_pval
-            , pct_FDRmax = 100*FDRmax) %>% 
-        select(pct_FDRmax, sweight, model, pct_signif) %>% 
+            , pct_FDRmax = 100*FDRmax
+            , pstar = pval
+            , tstar = qnorm(1-pval/2)) %>% 
+        select(pct_FDRmax, sweight, model, pct_signif, pstar, tstar, pct_FDRmax) %>% 
         setDT()
     tabout = rbind(tabout, temp3)
 }
+
 
 tab_Storey = tabout %>% 
     left_join(temp1 %>% transmute(sweight, model, pct_alt = 100*pT)
@@ -154,20 +157,22 @@ rm(list = ls(pattern = "temp"))
 # convert to long and bind
 temp1 = tab_viz %>% pivot_longer(cols = -c(sweight, model)) %>% 
   mutate(value = value*100)
-temp2 = tab_Storey %>% select(-pct_alt) %>% pivot_wider(
-    id_cols = c(sweight, model), names_from = pct_FDRmax, values_from = pct_signif
-    , names_prefix = 'pct_signif_'
-    ) %>% 
-    pivot_longer(cols = -c(sweight, model)) 
+temp2 = tab_Storey %>% 
+    filter(pct_FDRmax == 5) %>%
+    transmute(sweight, model
+        , h_HL = tstar
+        , pct_signif_HL = pct_signif) %>% 
+    pivot_longer(cols = -c(sweight, model))
+
 tab = temp1 %>% bind_rows(temp2)
 
 # make the nice wide table
 stat_select = c('Pr_tgt_2', 'Pr_tlt_1'
     , 'pFmax', 'FDRmax_viz_1'
-    ,'pct_signif_5', 'pct_signif_10')
+    ,'h_HL', 'pct_signif_HL')
 stat_label = c('Share of $|t_i| > 2.0$', 'Share of $|t_i| < 1.0$'
     , '$\\Pr(\\nullt_i)$ Upper Bound', '$\\FDRez$ Upper Bound'
-    , 'FDR $\\le$ 5\\%', 'FDR $\\le$ 10\\%')
+    , '$t$-statistic Hurdle', 'Percent Significant')
 model_select = c('CAPM', 'FF3', 'FF3+Mom')
 
 tabwide = tab %>% filter(name %in% stat_select
@@ -198,7 +203,7 @@ tex = tex %>% append(paste(
 ), after = 6)
 tex = tex %>% append(paste(
     "\\\\"
-    , "\\multicolumn{7}{l}{Panel (b): Percent Significant using Storey (2002)}"
+    , "\\multicolumn{7}{l}{Panel (b): Significance using Storey (2002) with $\\text{FDR}\\le 5\\%$}"
     , "\\\\ \\midrule"
     , sep = " "
 ), after = 11)
