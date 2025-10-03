@@ -543,6 +543,8 @@ small %>%
     , sum(tabs>2.27)
     , sum((tabs>2.27) & (v==label_false))
     , sum(tabs<3.8 & tabs>2)
+    , sum(tabs>2)
+    , sum((tabs>2) & (v==label_false))
   ) %>% 
   t()
 
@@ -552,6 +554,12 @@ dat %>%
   summarize(
     sum((tabs<3.8)&(tabs>2))/sum(tabs>2) 
   )
+
+dat %>% 
+  summarize(
+    sum((tabs<2.95)&(tabs>2))/sum(tabs>2) 
+  )
+
 
 # HLZ Data Distribution --------------------------------------------------------
 
