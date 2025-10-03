@@ -363,7 +363,59 @@ small = small %>%
     v_hlz_alt = factor(
       v_hlz_alt, levels = c(TRUE,FALSE), labels = c(lab_hlz_true, lab_hlz_false)
     )
+  ) %>% 
+  mutate(
+    v_hlz_3point0 = case_when(
+      tabs > hurdle_01 ~ TRUE
+      , tabs <= hurdle_01 ~ FALSE
+    )
+  ) %>% mutate(
+    v_hlz_3point0 = factor(
+      v_hlz_3point0, levels = c(TRUE,FALSE), labels = c(lab_hlz_true, lab_hlz_false)
+    )
   ) 
+
+# relabel 
+q2_3point0 = ggplot(small, aes(x=tselect,y=mu_scatter)) +
+  geom_point(aes(group = v_hlz_3point0, color = v_hlz_3point0, shape = v_hlz_3point0), size = 2.5) +
+  scale_shape_manual(values = c(16, 1)) +
+  scale_color_manual(values=c(MATBLUE, MATRED)) +
+  coord_cartesian(xlim = c(-0.1,10), ylim = c(-0.5,300)) +
+  scale_x_continuous(breaks = seq(-10,20,2)) +
+  scale_y_continuous(breaks = seq(0,500,50)) +  
+  chen_theme +
+  theme(
+    legend.position = c(.80, .15)
+    , panel.grid.major = element_blank()
+    , panel.grid.minor = element_blank()
+  ) +
+  xlab(TeX("|t-statistic|")) +
+  ylab(TeX("Expected Return (bps p.m.)")) +
+  geom_vline(xintercept = hurdle_01, size = linesize, color = MATRED, linetype = 'dotdash')+  
+  annotate(geom="text", 
+           label="FDR = 1%", 
+           x=3, y=texty, vjust=-1, 
+           family = "Palatino Linotype", angle = 90, size = textsize, color = MATRED
+  ) + 
+  geom_vline(xintercept = 2.27, size = linesize, color=MATYELLOW
+             , linetype='longdash') +
+  annotate(geom="text", label="FDR = 5%", 
+           x=2.40, y=texty, vjust=-1, 
+           family = "Palatino Linotype", angle = 90, size = textsize, color = MATYELLOW
+  ) + 
+  geom_vline(xintercept = 1.96, size = linesize) +
+  annotate(geom="text", label="Classical Hurdle", 
+           x=1.95, y=texty, vjust=-1, 
+           family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
+  )  + 
+  geom_vline(xintercept = hurdle_bonf05, size = linesize, color = 'darkorchid', linetype = 'dotted') +
+  annotate(geom="text", 
+           label=TeX("Bonferroni 5\\%"), 
+           x=hurdle_bonf05, y=texty, vjust=-1, 
+           family = "Palatino Linotype", angle = 90, size = textsize, color = 'darkorchid'
+  ) 
+ 
+ggsave('../results/post-truth-3-3point0.pdf', width = 12, height = 8, device =cairo_pdf)    
 
 # relabel
 q2 = ggplot(small, aes(x=tselect,y=mu_scatter)) +
