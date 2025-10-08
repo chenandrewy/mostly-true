@@ -158,7 +158,7 @@ rm(list = ls(pattern = "temp"))
 temp1 = tab_viz %>% pivot_longer(cols = -c(sweight, model)) %>% 
   mutate(value = value*100)
 temp2 = tab_Storey %>% 
-    filter(pct_FDRmax == 5) %>%
+    filter(pct_FDRmax == 10) %>%
     transmute(sweight, model
         , h_HL = tstar
         , pct_signif_HL = pct_signif) %>% 
@@ -203,7 +203,7 @@ tex = tex %>% append(paste(
 ), after = 6)
 tex = tex %>% append(paste(
     "\\\\"
-    , "\\multicolumn{7}{l}{Panel (b): Significance using Storey (2002) with $\\text{FDR}\\le 5\\%$}"
+    , "\\multicolumn{7}{l}{Panel (b): Significance using Storey (2002) with $\\text{FDR}\\le 10\\%$}"
     , "\\\\ \\midrule"
     , sep = " "
 ), after = 11)
@@ -214,6 +214,6 @@ tex[6] = '\\cline{2-7}'
 
 writeLines(tex, con='../results/yz-fdr.tex')
 
-
+writeLines(tex, con='../paper/exhibits/yz-fdr.tex')
 
 
