@@ -1,24 +1,30 @@
+# ABOUTME: Helper functions shared across data prep and simulation scripts
+# Inputs:
+#   - Called after sourcing by scripts like 01-prep-data.r
+#   - Requires here, data.table, tidyverse, ggplot2, ggthemes, gridExtra, latex2exp, foreach, doParallel, extrafont
+# Outputs:
+#   - Provides functions (e.g., bootstrap_flex) and global plotting settings to the calling script
+# How to run:
+#   source(here::here("functions.r"))
+#   Example:
+#   """
+#   library(here)
+#   source(here::here("functions.r"))
+#   """
+#
 # 2021 08 Andrew
 # frequently used functions for bh with pub bias
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
-}
+library(here)
 
 # PATHS AND LIBRARIES ====
 
-dir.create('../data/', showWarnings = F)
-dir.create('../results/', showWarnings = F)
-dir.create('../results/sim-theory-free/', showWarnings = F)
-dir.create('../results/sim-extrap-pub/', showWarnings = F)
+data_dir = here("data")
+results_dir = here("results")
+dir.create(data_dir, showWarnings = F, recursive = TRUE)
+dir.create(results_dir, showWarnings = F, recursive = TRUE)
+dir.create(file.path(results_dir, 'sim-theory-free'), showWarnings = F, recursive = TRUE)
+dir.create(file.path(results_dir, 'sim-extrap-pub'), showWarnings = F, recursive = TRUE)
 
 library(data.table)
 library(tidyverse)

@@ -1,25 +1,38 @@
-# 2021 08 Andrew
-# Generate data for BH style FDR estimates 
-# makes '../data/emp_data.Rdata'
+# ABOUTME: Downloads and processes predictor return data from Google Drive and Dropbox
+# ABOUTME: Creates cleaned datasets for Chen et al., CLZ, and Yan-Zheng predictors
+# Inputs:
+#   - functions.r (in current directory)
+#   - googledrive package (for authentication)
+#   - here package (for project-relative paths)
+#   - Chen et al. predictors data (downloaded from Google Drive)
+#   - CLZ predictor data (downloaded from Google Drive)
+#   - Yan-Zheng predictor data (downloaded from Dropbox)
+# Outputs:
+#   - data/emp_data.Rdata (contains cz_ret, cz_sum, clz_ret, clz_sum, clzvw_ret, clzvw_sum, yz_ret, yz_sum, yzvw_ret, yzvw_sum)
+#   - data/PredictorPortsFull.csv (downloaded from Google Drive)
+#   - data/SignalDoc.csv (downloaded from Google Drive)
+#   - data/CLZ_raw.csv (downloaded from Google Drive)
+#   - data/CLZvw_raw.csv (downloaded from Google Drive)
+#   - data/Yan_Zheng_RFS_Data.sas7bdat (downloaded from Dropbox)
+# How to run:
+#   Rscript 01-prep-data.r
+#   (will prompt for Google Drive authentication in browser)
 
 # ENVIRONMENT -------------------------------
 
 rm(list = ls())
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
-}
-
-source('functions.r')
+library(here)
 library(googledrive)
+library(haven)
+here::i_am("01-prep-data.r")
+
+source(here("functions.r"))
+
+data_dir = here("data")
+if (!dir.exists(data_dir)) {
+  dir.create(data_dir, recursive = TRUE)
+}
 
 ### USER ENTRY
 # root of March 2022 release on Gdrive
@@ -37,23 +50,23 @@ target_dribble = pathRelease %>% drive_ls() %>%
   filter(name=='Full Sets OP') %>% drive_ls() %>% 
   filter(name=='PredictorPortsFull.csv')
 
-drive_download(target_dribble, path = '../data/PredictorPortsFull.csv', overwrite = T)
+drive_download(target_dribble, path = file.path(data_dir, 'PredictorPortsFull.csv'), overwrite = T)
 
 # download header info
 target_dribble = pathRelease %>% drive_ls() %>% 
   filter(name=='SignalDoc.csv')
 
-drive_download(target_dribble, path = '../data/SignalDoc.csv', overwrite = T)
+drive_download(target_dribble, path = file.path(data_dir, 'SignalDoc.csv'), overwrite = T)
 
 # PROCESS DATA -------------------------------
 
 ## import into R -------------------------------
 
-ret0 = fread('../data/PredictorPortsFull.csv') %>% 
+ret0 = fread(file.path(data_dir, 'PredictorPortsFull.csv')) %>% 
   filter(port=='LS') %>% 
   select(signalname, date, ret)
 
-header = fread('../data/SignalDoc.csv') %>% 
+header = fread(file.path(data_dir, 'SignalDoc.csv')) %>% 
   rename(signalname=Acronym)
 
 ## construct benchmark data -------------------------------
@@ -90,10 +103,10 @@ url_clz = 'https://drive.google.com/drive/folders/16RqeHNyU5gcqjRUvqSeOfQCxu_B2m
 target_dribble = url_clz %>% drive_ls() %>% 
   filter(name=='DataMinedLongShortReturnsEW.csv')
 
-drive_download(target_dribble, path = '../data/CLZ_raw.csv', overwrite = T)
+drive_download(target_dribble, path = file.path(data_dir, 'CLZ_raw.csv'), overwrite = T)
 
 # clean up
-temp0 = fread('../data/CLZ_raw.csv') 
+temp0 = fread(file.path(data_dir, 'CLZ_raw.csv')) 
 
 clz_ret = temp0 %>% 
   mutate(date = paste(year, month, '28', sep = '-')
@@ -123,10 +136,10 @@ url_clz = 'https://drive.google.com/drive/folders/16RqeHNyU5gcqjRUvqSeOfQCxu_B2m
 target_dribble = url_clz %>% drive_ls() %>% 
   filter(name=='DataMinedLongShortReturnsVW.csv')
 
-drive_download(target_dribble, path = '../data/CLZvw_raw.csv', overwrite = T)
+drive_download(target_dribble, path = file.path(data_dir, 'CLZvw_raw.csv'), overwrite = T)
 
 # clean up
-temp0 = fread('../data/CLZvw_raw.csv') 
+temp0 = fread(file.path(data_dir, 'CLZvw_raw.csv')) 
 
 clzvw_ret = temp0 %>% 
   mutate(date = paste(year, month, '28', sep = '-')
@@ -136,8 +149,47 @@ clzvw_ret = temp0 %>%
   filter(date >= '1963-07-01')
 
 # repeatedly used summary stats (in-sample)
-clzvw_sum = clzvw_ret %>% 
-  group_by(signalname) %>% 
+clzvw_sum = clzvw_ret %>%
+  group_by(signalname) %>%
+  summarize(
+    rbar = mean(ret)
+    , vol = sd(ret)
+    , nmonth = n()
+    , traw = rbar/vol*sqrt(nmonth)
+    , tabs = abs(traw)
+  ) %>% setDT()
+
+# ADD YZ DATA -------------------------------
+
+# download from Dropbox
+url_yz = 'https://www.dropbox.com/scl/fi/tv7zhkgrb7jbl4mr2ccdn/Yan_Zheng_RFS_Data.sas7bdat?rlkey=zxcrit8ptfe4mdq0q5blbx71c&st=s5ox6lts&dl=1'
+download.file(url_yz, destfile = file.path(data_dir, 'Yan_Zheng_RFS_Data.sas7bdat'), mode = 'wb')
+
+# import sas data
+yzraw = read_sas(file.path(data_dir, 'Yan_Zheng_RFS_Data.sas7bdat'))
+setDT(yzraw)
+
+# clean
+yzraw[ , signalname := paste0(transformation, '|', fsvariable)][
+  , date := DATE][
+  , c('DATE', 'transformation','fsvariable') := NULL]
+
+# separate
+yz_ret = yzraw %>% transmute(date,signalname,ret=ddiff_ew)
+yzvw_ret = yzraw %>% transmute(date,signalname,ret=ddiff_vw)
+
+# summarize
+yz_sum = yz_ret %>%
+  group_by(signalname) %>%
+  summarize(
+    rbar = mean(ret)
+    , vol = sd(ret)
+    , nmonth = n()
+    , traw = rbar/vol*sqrt(nmonth)
+    , tabs = abs(traw)
+  ) %>% setDT()
+yzvw_sum = yzvw_ret %>%
+  group_by(signalname) %>%
   summarize(
     rbar = mean(ret)
     , vol = sd(ret)
@@ -150,57 +202,9 @@ clzvw_sum = clzvw_ret %>%
 
 save(
   list = c(
-    'cz_ret','cz_sum', 'clz_ret', 'clz_sum', 'clzvw_ret', 'clzvw_sum'
+    'cz_ret','cz_sum'
+    , 'clz_ret', 'clz_sum', 'clzvw_ret', 'clzvw_sum'
+    , 'yz_ret', 'yz_sum', 'yzvw_ret', 'yzvw_sum'
     )
-  , file = '../data/emp_data.Rdata'
+  , file = file.path(data_dir, 'emp_data.Rdata')
 )
-
-
-# CHECK IF YZ DATA IS AVAILABLE ===
-
-if (file.exists('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat')){
-  # import sas data
-  library(haven)
-  yzraw = read_sas('../data_yan_zheng/unzipped/Yan_Zheng_RFS_Data.sas7bdat')
-  setDT(yzraw)
-
-  # clean
-  yzraw[ , signalname := paste0(transformation, '|', fsvariable)][
-    , date := DATE][
-    , c('DATE', 'transformation','fsvariable') := NULL]
-  
-  # separate
-  yz_ret = yzraw %>% transmute(date,signalname,ret=ddiff_ew)
-  yzvw_ret = yzraw %>% transmute(date,signalname,ret=ddiff_vw)
-
-  # summarize
-  yz_sum = yz_ret %>% 
-    group_by(signalname) %>% 
-    summarize(
-      rbar = mean(ret)
-      , vol = sd(ret)
-      , nmonth = n()
-      , traw = rbar/vol*sqrt(nmonth)
-      , tabs = abs(traw)
-    ) %>% setDT()
-  yzvw_sum = yzvw_ret %>% 
-    group_by(signalname) %>% 
-    summarize(
-      rbar = mean(ret)
-      , vol = sd(ret)
-      , nmonth = n()
-      , traw = rbar/vol*sqrt(nmonth)
-      , tabs = abs(traw)
-    ) %>% setDT()
-  
-  ## SAVE TO DISK -------------------------------
-  save(
-    list = c(
-      'cz_ret','cz_sum'
-      , 'clz_ret', 'clz_sum', 'clzvw_ret', 'clzvw_sum'
-      , 'yz_ret', 'yz_sum', 'yzvw_ret', 'yzvw_sum'
-      )
-    , file = '../data/emp_data.Rdata'
-  )  
-
-} # end if yz data is availabl
