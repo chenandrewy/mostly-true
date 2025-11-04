@@ -1,6 +1,6 @@
 # ABOUTME: Simulates publication-bias scenarios to benchmark CZ extrapolation.
 # Inputs:
-#   - functions.r (project utilities)
+#   - config-and-functions.r (project utilities)
 #   - data/emp_data.Rdata (predictor returns from 01-prep-data.r)
 # Outputs:
 #   - data/deleteme-sim-extrap-pub.RData
@@ -21,14 +21,11 @@ rm(list=ls())
 library(here)
 here::i_am("94-simulations-publication-bias.r")
 
-source(here("functions.r"))
+source(here("config-and-functions.r"))
 
-data_dir <- here("data")
-results_dir <- here("results")
-
-if (!dir.exists(results_dir)) {
-  dir.create(results_dir, recursive = TRUE)
-}
+paths <- project_paths()
+data_dir <- paths$data
+results_dir <- paths$results
 
 sim_rdata_path <- file.path(data_dir, "deleteme-sim-extrap-pub.RData")
 cor_extrap_pdf_path <- file.path(results_dir, "cor-extrap-pub.pdf")

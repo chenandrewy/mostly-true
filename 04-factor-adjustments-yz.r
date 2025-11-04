@@ -1,6 +1,6 @@
 # ABOUTME: Estimates factor-adjusted performance for Yan-Zheng predictors and exports LaTeX tables.
 # Inputs:
-#   - functions.r (project utilities and helper functions)
+#   - config-and-functions.r (project utilities and helper functions)
 #   - data/emp_data.Rdata (predictor return data created by 01-prep-data.r)
 #   - Internet: Ken French data library ZIPs for factor downloads
 # Outputs:
@@ -20,19 +20,12 @@ rm(list = ls())
 library(here)
 here::i_am("04-factor-adjustments-yz.r")
 
-source(here("functions.r"))
+source(here("config-and-functions.r"))
 
-data_dir <- here("data")
-results_dir <- here("results")
+paths <- project_paths()
+data_dir <- paths$data
+results_dir <- paths$results
 paper_exhibits_dir <- here("..", "paper", "exhibits")
-
-if (!dir.exists(data_dir)) {
-  dir.create(data_dir, recursive = TRUE)
-}
-
-if (!dir.exists(results_dir)) {
-  dir.create(results_dir, recursive = TRUE)
-}
 
 temp_zip_path <- file.path(data_dir, "deleteme.zip")
 ff3_csv_path <- file.path(data_dir, "F-F_Research_Data_Factors.csv")

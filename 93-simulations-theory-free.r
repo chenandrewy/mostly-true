@@ -1,6 +1,6 @@
 # ABOUTME: Runs theory-free simulations comparing empirical and simulated discovery rates.
 # Inputs:
-#   - functions.r (project helpers and plotting utilities)
+#   - config-and-functions.r (project helpers and plotting utilities)
 #   - data/emp_data.Rdata
 #   - data/bootnull.Rdata (from 91-run-bootstraps.r)
 # Outputs:
@@ -19,14 +19,11 @@ rm(list = ls())
 library(here)
 here::i_am("93-simulations-theory-free.r")
 
-source(here("functions.r"))
+source(here("config-and-functions.r"))
 
-data_dir <- here("data")
-results_dir <- here("results")
-
-if (!dir.exists(results_dir)) {
-  dir.create(results_dir, recursive = TRUE)
-}
+paths <- project_paths()
+data_dir <- paths$data
+results_dir <- paths$results
 
 load(file.path(data_dir, "emp_data.Rdata"))
 load(file.path(data_dir, "bootnull.Rdata"))

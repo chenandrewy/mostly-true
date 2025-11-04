@@ -1,5 +1,6 @@
 # ABOUTME: Simulates and visualizes Harvey-Liu-Zhu style factor selection to reconcile literature findings.
 # Inputs:
+#   - config-and-functions.r (project utilities for directory setup)
 #   - No external data files; relies on random draws and packages tidyverse, data.table, ggplot2, extrafont, latex2exp
 # Outputs:
 #   - results/slow-0.pdf through results/slow-9.pdf
@@ -26,10 +27,10 @@ library(latex2exp)
 
 here::i_am("06-literature-reconciliation-hlz.r")
 
-results_dir <- here("results")
-if (!dir.exists(results_dir)) {
-  dir.create(results_dir, recursive = TRUE)
-}
+source(here("config-and-functions.r"))
+
+paths <- project_paths()
+results_dir <- paths$results
 
 temp_tex_path <- file.path(results_dir, "temp.tex")
 hlz_tdist_path <- file.path(results_dir, "hlz-tdist.tex")

@@ -1,7 +1,7 @@
 # ABOUTME: Downloads and processes predictor return data from Google Drive and Dropbox
 # ABOUTME: Creates cleaned datasets for Chen et al., CLZ, and Yan-Zheng predictors
 # Inputs:
-#   - functions.r (in current directory)
+#   - config-and-functions.r (project configuration and helpers)
 #   - googledrive package (for authentication)
 #   - here package (for project-relative paths)
 #   - Chen et al. predictors data (downloaded from Google Drive)
@@ -27,12 +27,10 @@ library(googledrive)
 library(haven)
 here::i_am("01-prep-data.r")
 
-source(here("functions.r"))
+source(here("config-and-functions.r"))
 
-data_dir = here("data")
-if (!dir.exists(data_dir)) {
-  dir.create(data_dir, recursive = TRUE)
-}
+paths <- project_paths()
+data_dir <- paths$data
 
 ### USER ENTRY
 # root of March 2022 release on Gdrive

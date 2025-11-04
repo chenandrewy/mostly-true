@@ -1,6 +1,6 @@
 # ABOUTME: Builds diagnostic figures and tables contrasting empirical distribution with null models.
 # Inputs:
-#   - functions.r (project utilities)
+#   - config-and-functions.r (project utilities)
 #   - data/emp_data.Rdata (summaries for CLZ signals)
 #   - data/bootact.Rdata (bootstrap samples saved by 91-run-bootstraps.r)
 # Outputs:
@@ -33,14 +33,11 @@ rm(list = ls())
 library(here)
 here::i_am("03-visual-bounds.r")
 
-source(here("functions.r"))
+source(here("config-and-functions.r"))
 
-data_dir <- here("data")
-results_dir <- here("results")
-
-if (!dir.exists(results_dir)) {
-  dir.create(results_dir, recursive = TRUE)
-}
+paths <- project_paths()
+data_dir <- paths$data
+results_dir <- paths$results
 
 bootfdr_txt_path <- file.path(results_dir, "bootFDR_results.txt")
 temp_tex_path <- file.path(results_dir, "temp.tex")

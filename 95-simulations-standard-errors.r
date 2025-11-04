@@ -1,6 +1,6 @@
 # ABOUTME: Simulates standard-error estimation accuracy for large-scale inference histograms.
 # Inputs:
-#   - functions.r (utility functions including bootstrap_flex)
+#   - config-and-functions.r (utility functions including bootstrap_flex)
 # Outputs:
 #   - results/sim-se.pdf
 #   - results/sim-se-count.pdf
@@ -30,12 +30,10 @@ rm(list = ls())
 library(here)
 here::i_am("95-simulations-standard-errors.r")
 
-source(here("functions.r"))
+source(here("config-and-functions.r"))
 
-results_dir <- here("results")
-if (!dir.exists(results_dir)) {
-  dir.create(results_dir, recursive = TRUE)
-}
+paths <- project_paths()
+results_dir <- paths$results
 
 start_time <- Sys.time()
 

@@ -1,6 +1,6 @@
 # ABOUTME: Runs bootstrap simulations for CLZ returns to support downstream inference.
 # Inputs:
-#   - functions.r (bootstrap helpers)
+#   - config-and-functions.r (bootstrap helpers and directory configuration)
 #   - data/emp_data.Rdata (predictor returns from 01-prep-data.r)
 # Outputs:
 #   - data/bootnull.Rdata
@@ -15,12 +15,10 @@ rm(list = ls())
 library(here)
 here::i_am("91-run-bootstraps.r")
 
-source(here("functions.r"))
+source(here("config-and-functions.r"))
 
-data_dir <- here("data")
-if (!dir.exists(data_dir)) {
-  dir.create(data_dir, recursive = TRUE)
-}
+paths <- project_paths()
+data_dir <- paths$data
 
 bootnull_path <- file.path(data_dir, "bootnull.Rdata")
 bootact_path <- file.path(data_dir, "bootact.Rdata")

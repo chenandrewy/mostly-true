@@ -1,30 +1,55 @@
-# ABOUTME: Helper functions shared across data prep and simulation scripts
+# ABOUTME: Provides project configuration utilities alongside shared helper functions.
 # Inputs:
-#   - Called after sourcing by scripts like 01-prep-data.r
-#   - Requires here, data.table, tidyverse, ggplot2, ggthemes, gridExtra, latex2exp, foreach, doParallel, extrafont
+#   - Sourced by scripts (e.g., 01-prep-data.r) after calling here::i_am(<script>).
+#   - Requires here, data.table, tidyverse, ggplot2, ggthemes, gridExtra, latex2exp, foreach, doParallel, extrafont.
 # Outputs:
-#   - Provides functions (e.g., bootstrap_flex) and global plotting settings to the calling script
+#   - Ensures project directories exist and exposes reusable helper utilities.
 # How to run:
-#   source(here::here("functions.r"))
-#   Example:
+#   Rscript -e 'source(here::here("config-and-functions.r"))'
 #   """
 #   library(here)
-#   source(here::here("functions.r"))
+#   source(here::here("config-and-functions.r"))
+#   paths <- project_paths()
 #   """
-#
-# 2021 08 Andrew
-# frequently used functions for bh with pub bias
+# Folder layout:
+#   """
+#   project-root/
+#   ├─ main.r
+#   ├─ config-and-functions.r
+#   ├─ data/              # created if missing; RData/CSV outputs from prep scripts
+#   ├─ results/           # created if missing; PDFs/TEX/plots from analysis scripts
+#   │  ├─ sim-theory-free/
+#   │  └─ sim-extrap-pub/
+#   ├─ temp/              # scratch space for intermediates (optional; created on demand)
+#   ├─ 0X-*.r             # numbered analysis scripts
+#   └─ …
+#   """
+
+ensure_dir <- function(path) {
+  if (!dir.exists(path)) {
+    dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  }
+  path
+}
+
+project_paths <- function() {
+  results_root <- ensure_dir(here::here("results"))
+  list(
+    data = ensure_dir(here::here("data")),
+    temp = ensure_dir(here::here("temp")),
+    results = results_root,
+    results_sim_theory_free = ensure_dir(file.path(results_root, "sim-theory-free")),
+    results_sim_extrap_pub = ensure_dir(file.path(results_root, "sim-extrap-pub"))
+  )
+}
 
 library(here)
 
-# PATHS AND LIBRARIES ====
-
-data_dir = here("data")
-results_dir = here("results")
-dir.create(data_dir, showWarnings = F, recursive = TRUE)
-dir.create(results_dir, showWarnings = F, recursive = TRUE)
-dir.create(file.path(results_dir, 'sim-theory-free'), showWarnings = F, recursive = TRUE)
-dir.create(file.path(results_dir, 'sim-extrap-pub'), showWarnings = F, recursive = TRUE)
+paths <- project_paths()
+DATA_DIR <- paths$data
+RESULTS_DIR <- paths$results
+SIM_THEORY_FREE_DIR <- paths$results_sim_theory_free
+SIM_EXTRAP_PUB_DIR <- paths$results_sim_extrap_pub
 
 library(data.table)
 library(tidyverse)
