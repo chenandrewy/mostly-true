@@ -1,29 +1,38 @@
+# ABOUTME: Simulates and visualizes Harvey-Liu-Zhu style factor selection to reconcile literature findings.
+# Inputs:
+#   - No external data files; relies on random draws and packages tidyverse, data.table, ggplot2, extrafont, latex2exp
+# Outputs:
+#   - results/slow-0.pdf through results/slow-9.pdf
+#   - results/post-truth-1.pdf through results/post-truth-5.pdf (including post-truth-3-3point0.pdf)
+#   - results/temp.tex
+#   - results/hlz-tdist.tex
+# How to run:
+#   Rscript 06-literature-reconciliation-hlz.r
+#   Rscript 06-literature-reconciliation-hlz.r --vanilla
+
 # Setup -------------------------------------------------------------------
 rm(list = ls())
-
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
-}
 
 # uncomment for pretty fonts
 # install.packages('extrafont')
 # extrafont::font_import()
 
+library(here)
 library(tidyverse)
 library(data.table)
 library(ggplot2)
 library(extrafont)
 library(latex2exp)
 
-dir.create('../results/')
+here::i_am("06-literature-reconciliation-hlz.r")
+
+results_dir <- here("results")
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
+}
+
+temp_tex_path <- file.path(results_dir, "temp.tex")
+hlz_tdist_path <- file.path(results_dir, "hlz-tdist.tex")
 
 MATBLUE = rgb(0,0.4470,0.7410)
 MATRED = rgb(0.8500, 0.3250, 0.0980)
@@ -165,7 +174,7 @@ p0 = ggplot(small %>%
   ylab(TeX("Expected Return (bps p.m.)")) +
   theme(legend.position = 'none')
 
-ggsave('../results/slow-0.pdf', width = 12, height = 8, device = cairo_pdf)
+ggsave(file.path(results_dir, "slow-0.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p1 = ggplot(small %>% 
               filter(v==label_false), aes(x=tselect,y=mu_scatter)) +
@@ -180,7 +189,7 @@ p1 = ggplot(small %>%
   ylab(TeX("Expected Return (bps p.m.)")) +
   theme(legend.position = 'none')
 
-ggsave('../results/slow-1.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-1.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p2 =  ggplot(small, aes(x=tselect,y=mu_scatter)) +
   geom_point(aes(group = v, color = v, shape = v), size = 2.5) + 
@@ -194,7 +203,7 @@ p2 =  ggplot(small, aes(x=tselect,y=mu_scatter)) +
   ylab(TeX("Expected Return (bps p.m.)")) +
   theme(legend.position = 'none')
 
-ggsave('../results/slow-2.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-2.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 # plot FDR 1% line --------------------------------------------------------
 
@@ -206,11 +215,11 @@ p3 = p2 +
            family = "Palatino Linotype", angle = 0, size = textsize, color = 'black'
   ) 
 
-ggsave('../results/slow-3.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-3.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p4 = p3 +  chen_theme
 
-ggsave('../results/slow-4.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-4.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p4b = p4 + 
   annotate(geom="text", 
@@ -218,7 +227,7 @@ p4b = p4 +
            x=3, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATRED
   ) 
-ggsave('../results/slow-4b.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-4b.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p5 = p4b +
   annotate("rect", xmin = 3, xmax = 3.5, 
@@ -233,7 +242,7 @@ p5 = p4b +
            color='red', size=7,
            label='False Discoveries', family = "Palatino Linotype") 
 
-ggsave('../results/slow-5.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-5.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 # plot FDR 5% line ------------------------------------------------------------
 
@@ -247,7 +256,7 @@ p6 = p3 +
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATRED
   ) 
 
-ggsave('../results/slow-6.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-6.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p7 = p6  + 
   geom_vline(xintercept = 2.27, size = linesize, color=MATYELLOW
@@ -257,7 +266,7 @@ p7 = p6  +
            family = "Palatino Linotype", angle = 90, size = textsize, color = MATYELLOW
   ) 
 
-ggsave('../results/slow-7.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-7.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p7b = p7 + 
   annotate("rect", xmin = 2.3, xmax = 3.5, 
@@ -272,7 +281,7 @@ p7b = p7 +
            color='red', size=7,
            label='False Discoveries', family = "Palatino Linotype")
 
-ggsave('../results/slow-7b.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-7b.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 # plot classical hurdle --------------------------------------------------------------
 
@@ -284,7 +293,7 @@ p8 = p7  +
            , size = textsize, color = 'black'
   )
 
-ggsave('../results/slow-8.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-8.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 p9 = p8  + 
   annotate("rect", xmin = 2, xmax = 3.5, 
@@ -299,7 +308,7 @@ p9 = p8  +
            color='red', size=7,
            label='False Discoveries', family = "Palatino Linotype")
 
-ggsave('../results/slow-9.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "slow-9.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 # POST TRUTH --------------------------------------------------------------------
 
@@ -325,7 +334,7 @@ q1 = p2 +
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
   ) 
   
-ggsave('../results/post-truth-1.pdf', width = 12, height = 8, device =cairo_pdf)
+ggsave(file.path(results_dir, "post-truth-1.pdf"), width = 12, height = 8, device = cairo_pdf)
 
 # add Bonferroni
 qtemp = q1 + geom_vline(xintercept = hurdle_bonf05, size = linesize, color = 'darkorchid', linetype = 'dotted') +
@@ -334,7 +343,7 @@ qtemp = q1 + geom_vline(xintercept = hurdle_bonf05, size = linesize, color = 'da
            x=hurdle_bonf05, y=texty, vjust=-1, 
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'darkorchid'
   ) 
-ggsave('../results/post-truth-2.pdf', width = 12, height = 8, device =cairo_pdf)  
+ggsave(file.path(results_dir, "post-truth-2.pdf"), width = 12, height = 8, device = cairo_pdf)  
 
 # Relabel using post-truth -----------------------------------------------------------------
 
@@ -415,7 +424,7 @@ q2_3point0 = ggplot(small, aes(x=tselect,y=mu_scatter)) +
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'darkorchid'
   ) 
  
-ggsave('../results/post-truth-3-3point0.pdf', width = 12, height = 8, device =cairo_pdf)    
+ggsave(file.path(results_dir, "post-truth-3-3point0.pdf"), width = 12, height = 8, device = cairo_pdf)    
 
 # relabel
 q2 = ggplot(small, aes(x=tselect,y=mu_scatter)) +
@@ -457,7 +466,7 @@ q2 = ggplot(small, aes(x=tselect,y=mu_scatter)) +
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'darkorchid'
   ) 
  
-ggsave('../results/post-truth-3.pdf', width = 12, height = 8, device =cairo_pdf)  
+ggsave(file.path(results_dir, "post-truth-3.pdf"), width = 12, height = 8, device = cairo_pdf)  
 
 # even if exp ret is super high
 tempcolor = 'red'
@@ -470,7 +479,7 @@ qtemp = q2 +
            color=tempcolor,
            arrow=arrow(type = "closed", 
                        length = unit(0.2, "inches")))
-ggsave('../results/post-truth-4.pdf', width = 12, height = 8, device =cairo_pdf)    
+ggsave(file.path(results_dir, "post-truth-4.pdf"), width = 12, height = 8, device = cairo_pdf)    
 
 # Relabel for FDR 5% post-truth -------------------------------------------
 
@@ -522,7 +531,7 @@ p5 = ggplot(small, aes(x=tselect,y=mu_scatter))  +
            arrow=arrow(type = "closed", 
                        length = unit(0.2, "inches")))
 
-ggsave('../results/post-truth-5.pdf', width = 12, height = 8, device =cairo_pdf)  
+ggsave(file.path(results_dir, "post-truth-5.pdf"), width = 12, height = 8, device = cairo_pdf)  
 
 # Some numbers for the paper ---------------------------------------------------
 sig_share =  dat %>% filter(tabs>2) %>% summarize(sig_share = mean(tabs>2.27)) %>% 
@@ -612,10 +621,10 @@ library(kableExtra)
 tab %>% 
   kable('latex', booktabs = T, linesep = '', escape = F, digits = 2
   ) %>% 
-  cat(file='../results/temp.tex')
+  cat(file = temp_tex_path)
 
 # read in temp.tex and modify manually
-tex = readLines('../results/temp.tex') 
+tex = readLines(temp_tex_path) 
 # tex[4] = '$h$ & $\\Pr(|t_i|>h)$ & $\\Pr(|t_i|<h)$ & $\\#(|t_i|<h)$  & Description \\\\'
 # tex[4] = 'Hurdle & Prob  & Prob   & Number  & Description \\\\'
 tex[4] = '\\multirow{2}{*}{Hurdle} & \\multicolumn{1}{c}{Percent} & \\multicolumn{1}{c}{Percent} & \\multicolumn{1}{c}{Number} & \\multicolumn{1}{c}{Hurdle} & Implied $\\FDRez$ \\\\'
@@ -624,7 +633,7 @@ tex = tex %>%
   , after = 4) 
 tex = tex %>% gsub('NA', '', .)
 
-writeLines(tex, con='../results/hlz-tdist.tex')
+writeLines(tex, con = hlz_tdist_path)
 
 
 

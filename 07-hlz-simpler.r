@@ -1,29 +1,33 @@
+# ABOUTME: Provides a simplified HLZ simulation for two key comparison figures.
+# Inputs:
+#   - No external data files; uses random draws plus tidyverse/data.table/ggplot2/extrafont/latex2exp
+# Outputs:
+#   - results/hlz-simp-standard.pdf
+#   - results/hlz-simp-post-truth.pdf
+# How to run:
+#   Rscript 07-hlz-simpler.r
+#   Rscript 07-hlz-simpler.r --vanilla
+
 # Setup -------------------------------------------------------------------
 rm(list = ls())
-
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
-}
 
 # uncomment for pretty fonts
 # install.packages('extrafont')
 # extrafont::font_import()
 
+library(here)
 library(tidyverse)
 library(data.table)
 library(ggplot2)
 library(extrafont)
 library(latex2exp)
 
-dir.create('../results/')
+here::i_am("07-hlz-simpler.r")
+
+results_dir <- here("results")
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
+}
 
 MATBLUE = rgb(0,0.4470,0.7410)
 MATRED = rgb(0.8500, 0.3250, 0.0980)
@@ -188,7 +192,7 @@ q1 = p2 +
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
   ) 
 
-ggsave('../results/hlz-simp-standard.pdf', q1, width = 12, height = 8, device = cairo_pdf)  
+ggsave(file.path(results_dir, "hlz-simp-standard.pdf"), q1, width = 12, height = 8, device = cairo_pdf)  
 
 # Relabel using post-truth -----------------------------------------------------------------
 
@@ -237,7 +241,7 @@ q2_3point0 = ggplot(small, aes(x=tselect,y=mu_scatter)) +
            family = "Palatino Linotype", angle = 90, size = textsize, color = 'black'
   )
  
-ggsave('../results/hlz-simp-post-truth.pdf', q2_3point0, width = 12, height = 8, device = cairo_pdf)    
+ggsave(file.path(results_dir, "hlz-simp-post-truth.pdf"), q2_3point0, width = 12, height = 8, device = cairo_pdf)    
 
 
 # Some numbers for the paper ---------------------------------------------------

@@ -1,22 +1,53 @@
+# ABOUTME: Builds diagnostic figures and tables contrasting empirical distribution with null models.
+# Inputs:
+#   - functions.r (project utilities)
+#   - data/emp_data.Rdata (summaries for CLZ signals)
+#   - data/bootact.Rdata (bootstrap samples saved by 91-run-bootstraps.r)
+# Outputs:
+#   - results/dm-viz-storey-err.pdf
+#   - results/dm-viz-ez-err.pdf
+#   - results/dm-viz-storey-err-bern.pdf
+#   - results/dm-viz-ez-err-bern.pdf
+#   - results/dm-viz-storey.pdf
+#   - results/dm-viz-ez.pdf
+#   - results/dm-viz-axes-only.pdf
+#   - results/dm-viz-data-only.pdf
+#   - results/dm-viz-null-small-1.pdf
+#   - results/dm-viz-null-small-2.pdf
+#   - results/dm-viz-null-large-1.pdf
+#   - results/dm-viz-null-large-2.pdf
+#   - results/dm-viz-storey-color-1.pdf
+#   - results/dm-viz-storey-color-2.pdf
+#   - results/dm-viz-storey-color-3.pdf
+#   - results/dm-viz-storey-color-4.pdf
+#   - results/bootFDR_results.txt
+#   - results/tab_fdr_se.tex
+# How to run:
+#   Rscript 03-visual-bounds.r
+#   Rscript 03-visual-bounds.r --vanilla
+
 # Setup -------------------------------------
 
 rm(list = ls())
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
+library(here)
+here::i_am("03-visual-bounds.r")
+
+source(here("functions.r"))
+
+data_dir <- here("data")
+results_dir <- here("results")
+
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
 }
 
-source("functions.r")
-load("../data/emp_data.Rdata")
-load("../data/bootact.Rdata")
+bootfdr_txt_path <- file.path(results_dir, "bootFDR_results.txt")
+temp_tex_path <- file.path(results_dir, "temp.tex")
+tab_fdr_se_path <- file.path(results_dir, "tab_fdr_se.tex")
+
+load(file.path(data_dir, "emp_data.Rdata"))
+load(file.path(data_dir, "bootact.Rdata"))
 
 # plot settings
 color_emp <- "gray50"
@@ -169,7 +200,7 @@ plt <- ggplot(plotme_err[group != "null_ez"], aes(x = mids, y = dF)) +
     ))
   )
 
-ggsave("../results/dm-viz-storey-err.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-storey-err.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot ez null
 plt <- ggplot(plotme_err[group != "null"], aes(x = mids, y = dF)) +
@@ -215,7 +246,7 @@ plt <- ggplot(plotme_err[group != "null"], aes(x = mids, y = dF)) +
     ))
   )
 
-ggsave("../results/dm-viz-ez-err.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-ez-err.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 
 
@@ -273,7 +304,7 @@ plt <- ggplot(temp[group != "null_ez"], aes(x = mids, y = dF)) +
     ))
   )
 
-ggsave("../results/dm-viz-storey-err-bern.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-storey-err-bern.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot ez null
 plt <- ggplot(temp[group != "null"], aes(x = mids, y = dF)) +
@@ -319,7 +350,7 @@ plt <- ggplot(temp[group != "null"], aes(x = mids, y = dF)) +
     ))
   )
 
-ggsave("../results/dm-viz-ez-err-bern.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-ez-err-bern.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 
 # plot with formulas ====
@@ -363,7 +394,7 @@ plt <- ggplot(plotme[group != "null_ez"], aes(x = mids, y = dF)) +
     ))
   )
 
-ggsave("../results/dm-viz-storey.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-storey.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot easy null
 plt <- ggplot(plotme[group != "null"], aes(x = mids, y = dF)) +
@@ -403,7 +434,7 @@ plt <- ggplot(plotme[group != "null"], aes(x = mids, y = dF)) +
     ))
   )
 
-ggsave("../results/dm-viz-ez.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-ez.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plots for slides ---------------------------------------
 
@@ -442,7 +473,7 @@ plt <- ggplot(
   xlab(TeX("Absolute t-statistic")) +
   ylab("Number of Signals")
 
-ggsave("../results/dm-viz-axes-only.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-axes-only.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot data only (need to introduce CLZ for short slides)
 # plotme20min[group!='null_ez'] %>% mutate(dF = if_else(group=='null',0,dF))
@@ -465,7 +496,7 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null")] %>%
     name = ""
   )
 
-ggsave("../results/dm-viz-data-only.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-data-only.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot a null that's too small
 plt <- ggplot(plotme20min[group %in% c("emp", "null_small")], aes(x = mids, y = dF)) +
@@ -484,7 +515,7 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null_small")], aes(x = mids, y = 
     labels = c(lab_dat, lab_null),
     name = ""
   ) 
-ggsave("../results/dm-viz-null-small-1.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)  
+ggsave(file.path(results_dir, "dm-viz-null-small-1.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)  
 
 plt1 = plt +
   # annotate cute text
@@ -493,7 +524,7 @@ plt1 = plt +
     label = "too small", color = MATRED,
     family = "Arial", fontface = "bold", size = 5
   )
-ggsave("../results/dm-viz-null-small-2.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-null-small-2.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot null that's too large
 plt <- ggplot(plotme20min[group %in% c("emp", "null_large")], aes(x = mids, y = dF)) +
@@ -512,7 +543,7 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null_large")], aes(x = mids, y = 
     labels = c(lab_dat, lab_null),
     name = ""
   ) 
-ggsave("../results/dm-viz-null-large-1.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-null-large-1.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 plt1 = plt +
   # annotate cute text
@@ -522,7 +553,7 @@ plt1 = plt +
     family = "Arial", fontface = "bold", size = 5
   )
 
-ggsave("../results/dm-viz-null-large-2.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-null-large-2.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # plot null that fits just right
 plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
@@ -542,7 +573,7 @@ plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
     name = ""
   ) 
 
-ggsave("../results/dm-viz-storey-color-1.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-storey-color-1.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 plt1 = plt +
   # annotate cute text
@@ -552,7 +583,7 @@ plt1 = plt +
     family = "Arial", fontface = "plain", size = 5
   )
 
-ggsave("../results/dm-viz-storey-color-2.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-storey-color-2.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # remove cute text, add discovery line
 plt2 <- plt +
@@ -563,7 +594,7 @@ plt2 <- plt +
     label = "Discoveries ->", color = MATRED
   ) 
 
-ggsave("../results/dm-viz-storey-color-3.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-storey-color-3.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 # finally, add FDR text
 plt3 <- plt2 +
@@ -579,7 +610,7 @@ plt3 <- plt2 +
       "$FDR_{|t|>2}\\leq$ red / total = 9%"
     ))
   )
-ggsave("../results/dm-viz-storey-color-4.pdf", scale = 1, height = 2.5, width = 5, device = cairo_pdf)
+ggsave(file.path(results_dir, "dm-viz-storey-color-4.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
 
 
 
@@ -588,7 +619,7 @@ bootFDR_rounded <- bootFDR %>%
 # Round numeric columns in bootFDR to 3 decimal places
   mutate(across(where(is.numeric), function(x) x*100))
 
-capture.output(print(bootFDR_rounded, digits = 1), file = "../results/bootFDR_results.txt")
+capture.output(print(bootFDR_rounded, digits = 1), file = bootfdr_txt_path)
 
 print(bootFDR_rounded)
 
@@ -604,11 +635,11 @@ tabout = bootFDR %>% select(stat, point, boot_sd) %>%
 # Output latex table
 tabout %>%
   knitr::kable(format = "latex", booktabs = TRUE, digits = 1) %>% 
-  writeLines("../results/temp.tex")
+  writeLines(temp_tex_path)
 
 # manually edit tex
 # Read in the LaTeX table
-tex <- readLines("../results/temp.tex")
+tex <- readLines(temp_tex_path)
 
 tex[2] = '\\begin{tabular}{c ccc cc}'
 
@@ -636,4 +667,4 @@ tex[5] = paste0(
   , " \\\\ "
 )
 
-writeLines(tex, "../results/tab_fdr_se.tex")
+writeLines(tex, tab_fdr_se_path)

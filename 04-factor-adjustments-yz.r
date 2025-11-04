@@ -1,21 +1,47 @@
+# ABOUTME: Estimates factor-adjusted performance for Yan-Zheng predictors and exports LaTeX tables.
+# Inputs:
+#   - functions.r (project utilities and helper functions)
+#   - data/emp_data.Rdata (predictor return data created by 01-prep-data.r)
+#   - Internet: Ken French data library ZIPs for factor downloads
+# Outputs:
+#   - data/F-F_Research_Data_Factors.csv
+#   - data/F-F_Momentum_Factor.csv
+#   - results/temp.tex
+#   - results/yz-fdr.tex
+#   - paper/exhibits/yz-fdr.tex (if directory exists)
+# How to run:
+#   Rscript 04-factor-adjustments-yz.r
+#   Rscript 04-factor-adjustments-yz.r --vanilla
+
 #%% Setup -----------------------------------------------------------------------
 
 rm(list = ls())
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
+library(here)
+here::i_am("04-factor-adjustments-yz.r")
+
+source(here("functions.r"))
+
+data_dir <- here("data")
+results_dir <- here("results")
+paper_exhibits_dir <- here("..", "paper", "exhibits")
+
+if (!dir.exists(data_dir)) {
+  dir.create(data_dir, recursive = TRUE)
 }
 
-source('functions.r')
-load('../data/emp_data.Rdata')
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
+}
+
+temp_zip_path <- file.path(data_dir, "deleteme.zip")
+ff3_csv_path <- file.path(data_dir, "F-F_Research_Data_Factors.csv")
+momentum_csv_path <- file.path(data_dir, "F-F_Momentum_Factor.csv")
+temp_tex_path <- file.path(results_dir, "temp.tex")
+yz_fdr_results_path <- file.path(results_dir, "yz-fdr.tex")
+paper_yz_fdr_path <- file.path(paper_exhibits_dir, "yz-fdr.tex")
+
+load(file.path(data_dir, "emp_data.Rdata"))
 
 # merge vw and ew data
 ret1 = yz_ret %>% mutate(sweight = 'ew') %>%
@@ -28,18 +54,22 @@ setDT(ret1)
 ## Download FF + Carhart factors 
 
 # Download FF3
-download.file("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip"
-    , '../data/deleteme.zip')
-unzip('../data/deleteme.zip', exdir = '../data/')
+download.file(
+  "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip",
+  temp_zip_path
+)
+unzip(temp_zip_path, exdir = data_dir)
 
 # Download Momentum
-download.file("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_CSV.zip"
-    , '../data/deleteme.zip')
-unzip('../data/deleteme.zip', exdir = '../data/')
+download.file(
+  "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_CSV.zip",
+  temp_zip_path
+)
+unzip(temp_zip_path, exdir = data_dir)
 
 ## read csvs and merge 
-ff_fac = fread('../data/F-F_Research_Data_Factors.csv') %>% 
-    left_join(fread('../data/F-F_Momentum_Factor.csv'), by = 'V1') 
+ff_fac = fread(ff3_csv_path) %>% 
+    left_join(fread(momentum_csv_path), by = 'V1') 
 colnames(ff_fac) = c('yearm','mktrf','smb','hml','rf','mom')
 
 # clean
@@ -188,10 +218,10 @@ library(kableExtra)
 tabwide %>% 
   kable('latex', booktabs = T, linesep = '', escape = F, digits = 1
   ) %>% 
-  cat(file='../results/temp.tex')
+  cat(file = temp_tex_path)
 
 # read in temp.tex and modify manually
-tex = readLines('../results/temp.tex') 
+tex = readLines(temp_tex_path) 
 
 # add rows
 tex = tex %>% append('& \\multicolumn{3}{c}{Equal-Weighted}  &  \\multicolumn{3}{c}{Value-Weighted} \\\\', after = 3)
@@ -212,8 +242,8 @@ tex = tex %>% append(paste(
 tex[5] = ' & CAPM & FF3 & 4-fac & CAPM & FF3 & 4-fac \\\\'
 tex[6] = '\\cline{2-7}'
 
-writeLines(tex, con='../results/yz-fdr.tex')
+writeLines(tex, con = yz_fdr_results_path)
 
-writeLines(tex, con='../paper/exhibits/yz-fdr.tex')
-
-
+if (dir.exists(paper_exhibits_dir)) {
+  writeLines(tex, con = paper_yz_fdr_path)
+}

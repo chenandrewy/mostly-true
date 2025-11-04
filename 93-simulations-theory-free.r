@@ -1,25 +1,35 @@
-# 2022 05 10: simulation for dm data
+# ABOUTME: Runs theory-free simulations comparing empirical and simulated discovery rates.
+# Inputs:
+#   - functions.r (project helpers and plotting utilities)
+#   - data/emp_data.Rdata
+#   - data/bootnull.Rdata (from 91-run-bootstraps.r)
+# Outputs:
+#   - results/cor-theory-free.pdf
+#   - results/sim-dm-visual-<mutrue>.pdf
+#   - results/sim-dm-ez-only-<mutrue>.pdf
+# How to run:
+#   Rscript 93-simulations-theory-free.r
+#   Rscript 93-simulations-theory-free.r --vanilla
 
 # it's quite fast, the bootstrap is pre-computed
 
 # Setup -----------------------------------------------------------------------
 rm(list = ls())
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
+library(here)
+here::i_am("93-simulations-theory-free.r")
+
+source(here("functions.r"))
+
+data_dir <- here("data")
+results_dir <- here("results")
+
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
 }
 
-source("0-functions.r")
-load("../data/emp_data.Rdata")
-load('../data/bootnull.Rdata')
+load(file.path(data_dir, "emp_data.Rdata"))
+load(file.path(data_dir, "bootnull.Rdata"))
 
 ## User Settings ====
 
@@ -151,7 +161,7 @@ plt <- ggplot(
     values = c(NICEBLUE, "gray")
   ) +
   scale_linetype_manual(values = c("solid", "31"))
-ggsave(filename = "../results/cor-theory-free.pdf", width = 5, height = 4)
+ggsave(filename = file.path(results_dir, "cor-theory-free.pdf"), width = 5, height = 4)
 
 
 # Plot for Paper --------------------------------------------------------
@@ -217,7 +227,7 @@ for (mutruei in mutrue_list) {
     coord_cartesian(ylim = c(0, 100))
 
   ggsave(
-    paste0("../results/sim-dm-visual-", mutruei, ".pdf"), plt,
+    file.path(results_dir, sprintf("sim-dm-visual-%s.pdf", mutruei)), plt,
     width = 5, height = 2.5,
     scale = 1, device = cairo_pdf
   )
@@ -289,7 +299,7 @@ for (mutruei in mutrue_list) {
     coord_cartesian(ylim = c(0, 100))
 
   ggsave(
-    paste0("../results/sim-dm-ez-only-", mutruei, ".pdf"), plt,
+    file.path(results_dir, sprintf("sim-dm-ez-only-%s.pdf", mutruei)), plt,
     width = 5, height = 2.5,
     scale = 1, device = cairo_pdf
   )

@@ -1,23 +1,31 @@
-# runs all bootstraps and saves to disk
-# created 2024 07 to clean things up
+# ABOUTME: Runs bootstrap simulations for CLZ returns to support downstream inference.
+# Inputs:
+#   - functions.r (bootstrap helpers)
+#   - data/emp_data.Rdata (predictor returns from 01-prep-data.r)
+# Outputs:
+#   - data/bootnull.Rdata
+#   - data/bootact.Rdata
+# How to run:
+#   Rscript 91-run-bootstraps.r
+#   Rscript 91-run-bootstraps.r --vanilla
 
 # setup ---------------------------
 rm(list = ls())
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
+library(here)
+here::i_am("91-run-bootstraps.r")
+
+source(here("functions.r"))
+
+data_dir <- here("data")
+if (!dir.exists(data_dir)) {
+  dir.create(data_dir, recursive = TRUE)
 }
 
-source('functions.r')
-load('../data/emp_data.Rdata')
+bootnull_path <- file.path(data_dir, "bootnull.Rdata")
+bootact_path <- file.path(data_dir, "bootact.Rdata")
+
+load(file.path(data_dir, "emp_data.Rdata"))
 
 set.boot = list(
   nboot = 1000,
@@ -35,7 +43,7 @@ toc = Sys.time()
 print(paste0('bootstrap done in min: ', difftime(toc, tic, units='mins')))
 
 # save
-save(bootnull, file = '../data/bootnull.Rdata')
+save(bootnull, file = bootnull_path)
 
 # bootstrap returns -----------------
 tic = Sys.time()
@@ -44,4 +52,4 @@ toc = Sys.time()
 print(paste0('bootstrap done in min: ', difftime(toc, tic, units='mins')))
 
 # save
-save(bootact, file = '../data/bootact.Rdata')
+save(bootact, file = bootact_path)

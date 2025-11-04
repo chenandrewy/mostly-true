@@ -1,4 +1,16 @@
-# 2022 05 10: simulation for cz data 
+# ABOUTME: Simulates publication-bias scenarios to benchmark CZ extrapolation.
+# Inputs:
+#   - functions.r (project utilities)
+#   - data/emp_data.Rdata (predictor returns from 01-prep-data.r)
+# Outputs:
+#   - data/deleteme-sim-extrap-pub.RData
+#   - results/cor-extrap-pub.pdf
+#   - results/sim-extrap-gamma-<mutrue>.pdf
+#   - results/sim-extrap-<mutrue>.pdf
+#   - results/deleteme.pdf
+# How to run:
+#   Rscript 94-simulations-publication-bias.r
+#   Rscript 94-simulations-publication-bias.r --vanilla
 
 # takes about 2 minutes for nsim = 200
 # this is just for the appendix now
@@ -6,21 +18,23 @@
 # Setup -----------------------------------------------------------------------
 rm(list=ls())
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
+library(here)
+here::i_am("94-simulations-publication-bias.r")
+
+source(here("functions.r"))
+
+data_dir <- here("data")
+results_dir <- here("results")
+
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
 }
 
-source('functions.r')
+sim_rdata_path <- file.path(data_dir, "deleteme-sim-extrap-pub.RData")
+cor_extrap_pdf_path <- file.path(results_dir, "cor-extrap-pub.pdf")
+deleteme_pdf_path <- file.path(results_dir, "deleteme.pdf")
 
-load('../data/emp_data.Rdata')
+load(file.path(data_dir, "emp_data.Rdata"))
 
 ## User entry ====
 
@@ -194,7 +208,7 @@ plt = ggplot(
     values=c(NICEBLUE, 'gray')
   ) +
   scale_linetype_manual(values = c('solid','31'))
-ggsave(filename = '../results/cor-extrap-pub.pdf', 
+ggsave(filename = cor_extrap_pdf_path, 
   , width = 5, height = 4)
 
 # Simulate many times ----------------------------------------------------------
@@ -272,10 +286,10 @@ simdat = estlist %>%
   )
 
 # Convenience Save --------------------------------------------------------
-save.image('../data/deleteme-sim-extrap-pub.RData')
+save.image(sim_rdata_path)
 
 # Convenience Load --------------------------------------------------------
-load('../data/deleteme-sim-extrap-pub.RData')
+load(sim_rdata_path)
 
 # Exhibits --------------------------------------------------------
 
@@ -335,7 +349,7 @@ for (mutruei in mutrue_list){
     coord_cartesian(ylim = c(0, 100)) 
   
   ggsave(
-    paste0('../results/sim-extrap-gamma-',mutruei,'.pdf'), plt, width = 8, height = 4
+    file.path(results_dir, sprintf('sim-extrap-gamma-%s.pdf', mutruei)), plt, width = 8, height = 4
     , scale = 0.6, device = cairo_pdf
   )
 } # for mutruei
@@ -397,7 +411,7 @@ for (mutruei in mutrue_list){
     coord_cartesian(ylim = c(0, 100)) 
   
   ggsave(
-    paste0('../results/sim-extrap-',mutruei,'.pdf'), plt, width = 8, height = 4
+    file.path(results_dir, sprintf('sim-extrap-%s.pdf', mutruei)), plt, width = 8, height = 4
     , scale = 0.6, device = cairo_pdf
   )
 } # for mutruei
@@ -457,4 +471,4 @@ p = ggplot(plotme, aes(x=tabs)) +
   theme_minimal() +
   coord_cartesian(xlim = c(0, 8)) +
   scale_x_continuous(breaks = seq(0, 15, 2))
-ggsave('../results/deleteme.pdf')
+ggsave(deleteme_pdf_path)

@@ -1,5 +1,13 @@
-# 2024 07 Andrew Chen
-# Simulation check on large scale inference histogram estimates
+# ABOUTME: Simulates standard-error estimation accuracy for large-scale inference histograms.
+# Inputs:
+#   - functions.r (utility functions including bootstrap_flex)
+# Outputs:
+#   - results/sim-se.pdf
+#   - results/sim-se-count.pdf
+# How to run:
+#   Rscript 95-simulations-standard-errors.r
+#   Rscript 95-simulations-standard-errors.r --vanilla
+
 # Consistent with Efron's intuition, if T is small compared to N, then the nonpar bootstrap SE is too large
 
 # N = 10000 # number of stocks / genes
@@ -19,19 +27,16 @@
 
 rm(list = ls())
 
-# Set working directory to unbreakable-bh folder
-if (basename(getwd()) != "unbreakable-bh") {
-  # Try to find unbreakable-bh directory
-  if (dir.exists("unbreakable-bh")) {
-    setwd("unbreakable-bh")
-  } else if (dir.exists("../unbreakable-bh")) {
-    setwd("../unbreakable-bh")  
-  } else {
-    stop("Please run this script from the unbreakable-bh directory or its parent directory.")
-  }
+library(here)
+here::i_am("95-simulations-standard-errors.r")
+
+source(here("functions.r"))
+
+results_dir <- here("results")
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
 }
 
-source("0-functions.r")
 start_time <- Sys.time()
 
 set.seed(123) # for reproducibility
@@ -251,7 +256,7 @@ plt <- plotme %>%
   ylab("SE of Hist Freq (%)") +
   coord_cartesian(xlim = c(0,8))
 
-ggsave("../results/sim-se.pdf", device = cairo_pdf, scale = 1.4, height = 2.5, width = 5)
+ggsave(file.path(results_dir, "sim-se.pdf"), device = cairo_pdf, scale = 1.4, height = 2.5, width = 5)
 
 
 ## Plot Counts ====
@@ -267,7 +272,7 @@ plt <- plotme %>%
   ylab("SE of Count") +
   coord_cartesian(xlim = c(0,8))
 
-ggsave("../results/sim-se-count.pdf", device = cairo_pdf, scale = 1.4, height = 2.5, width = 5)
+ggsave(file.path(results_dir, "sim-se-count.pdf"), device = cairo_pdf, scale = 1.4, height = 2.5, width = 5)
 
 
 
