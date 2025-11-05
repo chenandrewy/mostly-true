@@ -1,4 +1,5 @@
-# ABOUTME: Builds diagnostic figures and tables contrasting empirical distribution with null models.
+# ABOUTME: Builds diagnostic figures contrasting empirical distribution with null models.
+# ABOUTME: Creates dm-viz-storey-err.pdf and dm-viz-ez-err.pdf with bootstrap error bars.
 # Inputs:
 #   - config-and-functions.r (project utilities)
 #   - data/emp_data.Rdata (summaries for CLZ signals)
@@ -6,22 +7,6 @@
 # Outputs:
 #   - results/dm-viz-storey-err.pdf
 #   - results/dm-viz-ez-err.pdf
-#   - results/dm-viz-storey-err-bern.pdf
-#   - results/dm-viz-ez-err-bern.pdf
-#   - results/dm-viz-storey.pdf
-#   - results/dm-viz-ez.pdf
-#   - results/dm-viz-axes-only.pdf
-#   - results/dm-viz-data-only.pdf
-#   - results/dm-viz-null-small-1.pdf
-#   - results/dm-viz-null-small-2.pdf
-#   - results/dm-viz-null-large-1.pdf
-#   - results/dm-viz-null-large-2.pdf
-#   - results/dm-viz-storey-color-1.pdf
-#   - results/dm-viz-storey-color-2.pdf
-#   - results/dm-viz-storey-color-3.pdf
-#   - results/dm-viz-storey-color-4.pdf
-#   - results/bootFDR_results.txt
-#   - results/tab_fdr_se.tex
 # How to run:
 #   Rscript 03-visual-bounds.r
 #   Rscript 03-visual-bounds.r --vanilla
@@ -39,12 +24,11 @@ paths <- project_paths()
 data_dir <- paths$data
 results_dir <- paths$results
 
-bootfdr_txt_path <- file.path(results_dir, "bootFDR_results.txt")
-temp_tex_path <- file.path(results_dir, "temp.tex")
-tab_fdr_se_path <- file.path(results_dir, "tab_fdr_se.tex")
-
 load(file.path(data_dir, "emp_data.Rdata"))
 load(file.path(data_dir, "bootact.Rdata"))
+
+# ensure data.table format
+bootact <- as.data.table(bootact)
 
 # plot settings
 color_emp <- "gray50"
@@ -187,14 +171,15 @@ plt <- ggplot(plotme_err[group != "null_ez"], aes(x = mids, y = dF)) +
   ) +
   # annotate with SE
   annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
+    "text", x = 33 / 10, y = intuition_y, hjust = 0,
     label = TeX(paste0(
-      "FDR $\\leq "
+      "FDR $\\leq$ "
       , round(100*bootFDR$point[bootFDR$stat == "FDRmaxviz"], 1)
-      , " \\pm "
+      , " $\\pm$ "
       , round(100*bootFDR$boot_sd[bootFDR$stat == "FDRmaxviz"], 1)
-      , "\\%$"
-    ))
+      , "\\%"
+    ), output = "character"),
+    parse = TRUE
   )
 
 ggsave(file.path(results_dir, "dm-viz-storey-err.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
@@ -233,435 +218,15 @@ plt <- ggplot(plotme_err[group != "null"], aes(x = mids, y = dF)) +
   ) +
   # annotate with SE
   annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
+    "text", x = 33 / 10, y = intuition_y, hjust = 0,
     label = TeX(paste0(
-      "FDR $\\leq "
+      "FDR $\\leq$ "
       , round(100*bootFDR$point[bootFDR$stat == "FDRmaxez"], 1)
-      , " \\pm "
+      , " $\\pm$ "
       , round(100*bootFDR$boot_sd[bootFDR$stat == "FDRmaxez"], 1)
-      , "\\%$"
-    ))
+      , "\\%"
+    ), output = "character"),
+    parse = TRUE
   )
 
 ggsave(file.path(results_dir, "dm-viz-ez-err.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-
-
-# plot with error bars + bernoulli (for checking) ---------------------------------
-
-temp = plotme_err %>% 
-  mutate(se_bern = sqrt(dF/n_dm * (1 - dF/n_dm) / n_dm)*n_dm,
-    se_bern = ifelse(group=='emp',se_bern, NA),
-    dF_lo_bern = dF - se_bern,
-    dF_hi_bern = dF + se_bern)
-
-# plot storey null
-plt <- ggplot(temp[group != "null_ez"], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null)
-    # , labels=c('Data', paste0('False = ', round(pFmax*100,0), '% of Data'))
-    , labels = c("Data: CLZ EW", paste0("Null Component Bound")),
-    name = ""
-  ) +
-  # error bars
-  geom_errorbar(aes(ymin = dF_lo, ymax = dF_hi), width = 0.15, color = "grey30", size = 0.3) +
-  # bernoulli error bars
-  geom_errorbar(aes(ymin = dF_lo_bern, ymax = dF_hi_bern), width = 0.15, color = "magenta", size = 0.3, linetype = "dashed") +
-  # discovery line
-  geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(
-    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
-    label = "Discoveries ->", color = MATRED
-  ) +
-  theme(legend.position = c(80, 80) / 100) +
-  # write out intuition
-  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.1
-  ) +
-  # annotate with SE
-  annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
-    label = TeX(paste0(
-      "FDR $\\leq "
-      , round(100*bootFDR$point[bootFDR$stat == "FDRmaxviz"], 1)
-      , " \\pm "
-      , round(100*bootFDR$boot_sd[bootFDR$stat == "FDRmaxviz"], 1)
-      , "\\%$"
-    ))
-  )
-
-ggsave(file.path(results_dir, "dm-viz-storey-err-bern.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot ez null
-plt <- ggplot(temp[group != "null"], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null)
-    # , labels=c('Data', paste0('False = ', round(pFmax*100,0), '% of Data'))
-    , labels = c("Data: CLZ EW", paste0("Null Component Bound")),
-    name = ""
-  ) +
-  # error bars
-  geom_errorbar(aes(ymin = dF_lo, ymax = dF_hi), width = 0.15, color = "grey30", size = 0.3) +
-  # discovery line
-  geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(
-    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
-    label = "Discoveries ->", color = MATRED
-  ) +
-  theme(legend.position = c(80, 80) / 100) +
-  # write out intuition
-  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.1
-  ) +
-  # annotate with SE
-  annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
-    label = TeX(paste0(
-      "FDR $\\leq "
-      , round(100*bootFDR$point[bootFDR$stat == "FDRmaxez"], 1)
-      , " \\pm "
-      , round(100*bootFDR$boot_sd[bootFDR$stat == "FDRmaxez"], 1)
-      , "\\%$"
-    ))
-  )
-
-ggsave(file.path(results_dir, "dm-viz-ez-err-bern.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-
-# plot with formulas ====
-
-# plot storey null
-plt <- ggplot(plotme[group != "null_ez"], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null)
-    # , labels=c('Data', paste0('False = ', round(pFmax*100,0), '% of Data'))
-    , labels = c("Data: CLZ EW", paste0("Null Component Bound")),
-    name = ""
-  ) +
-  # discovery line
-  geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(
-    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
-    label = "Discoveries ->", color = MATRED
-  ) +
-  theme(legend.position = c(80, 80) / 100) +
-  # write out intuition
-  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.1
-  ) +
-  annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, ,
-    label = TeX(paste0(
-      "FDR $\\leq \\frac{5\\%}{", round(Pr_disc, 2), "}$ (",
-      round(pFmax, 2), ") = ",
-      round(FDRmaxez * pFmax * 100, 0), "%"
-    ))
-  )
-
-ggsave(file.path(results_dir, "dm-viz-storey.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot easy null
-plt <- ggplot(plotme[group != "null"], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
-  scale_y_continuous(breaks = yticks) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null)
-    # , labels=c('Data', paste0('False = ', round(1*100,0), '% of Data'))
-    , labels = c("Data: CLZ EW", paste0("Null Component Bound")),
-    name = ""
-  ) +
-  # discovery line
-  geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(
-    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
-    label = "Discoveries ->", color = MATRED
-  ) +
-  theme(legend.position = c(80, 80) / 100) +
-  # write out intuition
-  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.1
-  ) +
-  annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0,
-    label = TeX(paste0(
-      "FDR $\\leq \\frac{5\\%}{", round(Pr_disc, 2), "}$ (",
-      "1.00) = ",
-      round(FDRmaxez * 1 * 100, 0), "%"
-    ))
-  )
-
-ggsave(file.path(results_dir, "dm-viz-ez.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plots for slides ---------------------------------------
-
-# label explicitly for clarity in talks
-lab_dat <- "Data: CLZ's 29,000 EW Returns"
-lab_null <- "Null: Normal(0,1)"
-
-ylimnumslides = c(0, 8500)
-discovery_y <- 8000
-intuition_y <- 2800
-textpos = c(2.5, 3000) # for cute text
-
-## make plots ====
-
-# custom data for slides
-plotme20min <- plotme_err
-
-plotme20min <- plotme20min %>%
-  rbind(
-    plotme20min[group == "null"] %>%
-      mutate(dF = dF / 2, group = "null_small")
-  ) %>% 
-  rbind(
-    plotme20min[group == "null"] %>% 
-      mutate(dF = dF * 1.33, group = "null_large")
-  )
-
-# plot axes only
-plt <- ggplot(
-  plotme20min[group != "null_ez"] %>% mutate(dF = 0),
-  aes(x = mids, y = dF)
-) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals")
-
-ggsave(file.path(results_dir, "dm-viz-axes-only.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot data only (need to introduce CLZ for short slides)
-# plotme20min[group!='null_ez'] %>% mutate(dF = if_else(group=='null',0,dF))
-plt <- ggplot(plotme20min[group %in% c("emp", "null")] %>% 
-  mutate(dF = if_else(group=='null',0,dF)),
-  aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, lab_null),
-    name = ""
-  )
-
-ggsave(file.path(results_dir, "dm-viz-data-only.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot a null that's too small
-plt <- ggplot(plotme20min[group %in% c("emp", "null_small")], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, lab_null),
-    name = ""
-  ) 
-ggsave(file.path(results_dir, "dm-viz-null-small-1.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)  
-
-plt1 = plt +
-  # annotate cute text
-  annotate(
-    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
-    label = "too small", color = MATRED,
-    family = "Arial", fontface = "bold", size = 5
-  )
-ggsave(file.path(results_dir, "dm-viz-null-small-2.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot null that's too large
-plt <- ggplot(plotme20min[group %in% c("emp", "null_large")], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, lab_null),
-    name = ""
-  ) 
-ggsave(file.path(results_dir, "dm-viz-null-large-1.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-plt1 = plt +
-  # annotate cute text
-  annotate(
-    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
-    label = "too large", color = MATRED,
-    family = "Arial", fontface = "bold", size = 5
-  )
-
-ggsave(file.path(results_dir, "dm-viz-null-large-2.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# plot null that fits just right
-plt <- ggplot(plotme20min[group %in% c("emp", "null")], aes(x = mids, y = dF)) +
-  coord_cartesian(xlim = c(0, 8), ylim = ylimnumslides) +
-  scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
-  ylab("Number of Signals") +
-  # bars
-  geom_bar(
-    stat = "identity", position = "identity", alpha = bar_alpha,
-    aes(fill = group)
-  ) +
-  scale_fill_manual(
-    values = c(color_emp, color_null),
-    labels = c(lab_dat, lab_null),
-    name = ""
-  ) 
-
-ggsave(file.path(results_dir, "dm-viz-storey-color-1.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-plt1 = plt +
-  # annotate cute text
-  annotate(
-    geom = "text", x = textpos[1], y = textpos[2], hjust = 0,
-    label = "just right", color = MATBLUE,
-    family = "Arial", fontface = "plain", size = 5
-  )
-
-ggsave(file.path(results_dir, "dm-viz-storey-color-2.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# remove cute text, add discovery line
-plt2 <- plt +
-  # discovery line
-  geom_vline(xintercept = h_disc, color = MATRED) +
-  annotate(
-    geom = "text", x = 2.1, y = discovery_y, hjust = 0,
-    label = "Discoveries ->", color = MATRED
-  ) 
-
-ggsave(file.path(results_dir, "dm-viz-storey-color-3.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-# finally, add FDR text
-plt3 <- plt2 +
-  theme(legend.position = c(70, 70) / 100) +
-  # write out intuition
-  geom_segment(aes(xend = 22 / 10, yend = 250, x = 3.2, y = 2300),
-    arrow = arrow(length = unit(0.03, "npc")),
-    colour = "black", size = 0.1
-  ) +
-  annotate(
-    geom = "text", x = 33 / 10, y = intuition_y, hjust = 0, 
-    label = TeX(paste0(
-      "$FDR_{|t|>2}\\leq$ red / total = 9%"
-    ))
-  )
-ggsave(file.path(results_dir, "dm-viz-storey-color-4.pdf"), scale = 1, height = 2.5, width = 5, device = cairo_pdf)
-
-
-
-# output table with boot results --------------------------------
-bootFDR_rounded <- bootFDR %>%
-# Round numeric columns in bootFDR to 3 decimal places
-  mutate(across(where(is.numeric), function(x) x*100))
-
-capture.output(print(bootFDR_rounded, digits = 1), file = bootfdr_txt_path)
-
-print(bootFDR_rounded)
-
-## Simpler output for latex
-tabout = bootFDR %>% select(stat, point, boot_sd) %>% 
-  pivot_longer(cols = c(point, boot_sd))  %>% 
-  mutate(name = if_else(name == "point", "Estimate", "(SE)")
-     , value = ifelse(name == "(SE)", sprintf("(%.1f)", value * 100), sprintf("%.1f", value * 100))
-     , ) %>% 
-     pivot_wider(names_from = stat, values_from = value) %>% 
-     select(name, Pr_disc, Pr_small, pFmax, FDRmaxez, FDRmaxviz)
-
-# Output latex table
-tabout %>%
-  knitr::kable(format = "latex", booktabs = TRUE, digits = 1) %>% 
-  writeLines(temp_tex_path)
-
-# manually edit tex
-# Read in the LaTeX table
-tex <- readLines(temp_tex_path)
-
-tex[2] = '\\begin{tabular}{c ccc cc}'
-
-mrow = function(text, n) {paste0(" \\multirow{", n, "}{*}{", text, "}")}
-mcol = function(text, n) {paste0(" \\multicolumn{", n, "}{c}{", text, "}")}
-
-# insert line after 3
-tex <- append(tex, "", after = 3)
-tex[4] = paste0(
-  " " 
-  , "& ", mrow("$\\Pr(|t|>2)$", 2)
-  , "& ", mrow("$\\Pr(|t|<0.5)$", 2)
-  , "& ", mrow("$\\Pr(\\nullt)$", 2)
-  , "& ", mcol("$\\FDRez$ max", 2)
-  , " \\\\ "
-  , " \\cline{5-6} \\bigstrut[t] "
-)
-tex[5] = paste0(
-  " "
-  , "& "
-  , "& "
-  , "& "
-  , "& Easy "
-  , "& Visual "
-  , " \\\\ "
-)
-
-writeLines(tex, tab_fdr_se_path)

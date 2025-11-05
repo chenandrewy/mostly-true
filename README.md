@@ -1,7 +1,26 @@
-# mostly-true
-Code to accompany "Most claimed statistical findings in cross-sectional return predictability are likely true"
+# mostly-true-short
+Code to accompany "Most claimed statistical findings in cross-sectional return predictability are likely true" (Journal of Finance: Insights and Perspectives). 
 
-Code performs non- and semi-parametric FDR estimates a la Benjamini-Hochberg-Storey on the anomaly zoo, as well as simulation verifications.
+This code is a shorter and cleaner version of the `mostly-true` repo, which had results for the longer previous drafts of the paper. For simulation evidence that the FDR estimates work, see the `mostly-true` repo.
+
+# Exhibits in the paper
+- Table 1: Easy Bounds on the FDR
+  - `ez-combined.tex`
+  - Created with `ez-combined.xlsx`
+- Figure 1: Conservative Extrapolation from Published t-stats
+  - Created by `02-easy-bounds.r`
+  - Output name: `hlz-intuition.pdf`
+- Figure 2: A Visual Bound on the FDR
+  - Created by `03-visual-bounds.r`
+  - `dm-viz-storey-err.pdf` 
+  - `dm-viz-ez-err.pdf`
+- Table 2: FDR Estimates Controlling for Value Weighting and Factor Adjustments
+  - Created by `04-factor-adjustments-yz.r`
+  - Output name: `yz-fdr.tex`
+- Figure 3: Two Interpretations of Harvey, Liu, and Zhu's (2016) SMM Estimates 
+  - Created by: `hlz-simpler.r`
+  - Output names: `hlz-simp-standard.pdf` and `hlz-simp-post-truth.pdf`
+
 
 ## R Scripts
 
