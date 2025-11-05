@@ -6,7 +6,7 @@ This code is a shorter and cleaner version of the `mostly-true` repo, which had 
 # Exhibits in the paper
 - Table 1: Easy Bounds on the FDR
   - `ez-combined.tex`
-  - Created with `ez-table.xlsx`
+  - Created from `ez-table.xlsx` w/ excel2latex plugin (manually)
 - Figure 1: Conservative Extrapolation from Published t-stats
   - Created by `02-easy-bounds.r`
   - Output name: `hlz-intuition.pdf`

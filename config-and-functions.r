@@ -300,8 +300,3 @@ histogram_by_group = function(bootact, edge, varname = 'tstat', group = 'booti')
     ) %>% 
     setDT()
 }
-
-unregister_dopar <- function() {
-  env <- foreach:::.foreachGlobals
-  rm(list=ls(name=env), pos=env)
-}

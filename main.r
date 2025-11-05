@@ -2,7 +2,7 @@
 # Inputs:
 #   - None directly; each sourced script manages its own dependencies.
 # Outputs:
-#   - Aggregated side effects from sourced scripts (tables, figures, data artifacts inside `results/` and `data/`).
+#   - pdf and tex files in results/
 # How to run:
 #   """shell
 #   Rscript main.r
@@ -11,26 +11,22 @@
 library(here)
 here::i_am("main.r")
 
-run_scripts <- function(scripts) {
-  for (script in scripts) {
-    cat(sprintf("\n=== Running %s ===\n", script))
-    source(here(script), chdir = FALSE)
-  }
-}
+cat("\n=== Running 01-prep-data.r ===\n")
+# source(here("01-prep-data.r"), chdir = FALSE, echo = TRUE)
 
-data_prep <- c(
-  "01-prep-data.r"
-)
+cat("\n=== Running 02-easy-bounds.r ===\n")
+source(here("02-easy-bounds.r"), chdir = FALSE, echo = TRUE)
 
-main_analysis <- c(
-  "02-easy-bounds.r",
-  "03-visual-bounds.r",
-  "04-factor-adjustments-yz.r",
-  "04alt-factor-adjustments-clz.r",
-  "05-hlz-simpler.r"
-)
+cat("\n=== Running 03-visual-bounds.r ===\n")
+source(here("03-visual-bounds.r"), chdir = FALSE, echo = TRUE)
 
-run_scripts(c(data_prep))
-run_scripts(c(main_analysis))
+cat("\n=== Running 04-factor-adjustments-yz.r ===\n")
+source(here("04-factor-adjustments-yz.r"), chdir = FALSE, echo = TRUE)
+
+cat("\n=== Running 04alt-factor-adjustments-clz.r ===\n")
+source(here("04alt-factor-adjustments-clz.r"), chdir = FALSE, echo = TRUE)
+
+cat("\n=== Running 05-hlz-simpler.r ===\n")
+source(here("05-hlz-simpler.r"), chdir = FALSE, echo = TRUE)
 
 cat("\n=== All scripts completed successfully ===\n")

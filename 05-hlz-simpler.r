@@ -255,7 +255,6 @@ dat[tabs>2, ] %>% summarize(mean(v==label_false), n())
 small[tabs>2.95]
 small[tabs>2.27]
 small[(tabs>2.27) & (v==label_false)]
-hurdle_bonf05
 
 small %>% 
   summarize(
