@@ -39,6 +39,7 @@ simulations <- c(
   "95-simulations-standard-errors.r"
 )
 
-run_scripts(c(data_prep, main_analysis, simulations))
+# run_scripts(c(data_prep, main_analysis, simulations))
+run_scripts(c(main_analysis, simulations))
 
 cat("\n=== All scripts completed successfully ===\n")

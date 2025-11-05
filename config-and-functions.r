@@ -205,12 +205,13 @@ make_dist_dat = function(F1, edge1, N1, F2, edge2, N2
 } # make_dist_dat
 
 ## set theme ====
-theme_set(
-  theme_minimal() +
-    theme(
-      text = element_text(family = "Palatino Linotype")
-    )
-)
+# theme_set(
+#   theme_minimal() +
+#     theme(
+#       # text = element_text(family = "Palatino Linotype")
+#       text = element_text(family = "ArialMT")
+#     )
+# )
 
 # define bootstrap function -------------------------------
 bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr = "ret", min_obs_pct = 50, demean = TRUE, ncore = 1, output_cor = FALSE) {
