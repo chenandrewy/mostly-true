@@ -48,8 +48,6 @@ RESULTS_DIR <- paths$results
 library(data.table)
 library(tidyverse)
 library(ggplot2)
-library(ggthemes)
-# library(ggpattern)
 library(gridExtra)
 library(latex2exp)
 library(foreach)
@@ -57,88 +55,6 @@ library(doParallel)
 library(extrafont)
 
 # Global settings -----------------------------
-
-
-# STATS ====
-
-# truncated gamma moments
-mom_trunc_gamma = function(shape,scale,tmin,ord=1){
-  
-  tempd = function(t){dgamma(t,shape,scale = scale)}
-  
-  Fh = integrate(tempd, 0, tmin)$value
-  
-  intme = function(t){
-    t^ord*tempd(t)/(1-Fh)
-  }
-  temp = integrate(intme,tmin,Inf)
-  return = temp$value
-}
-
-# fit truncated gamma
-est_trunc_gamma = function(tabs, tgood, shape, ord=1){
-  # tabs = rgamma(n = 1e3, shape = 0.5, scale = 1) 
-  # shape = 0.5
-  # ord = 1
-  # tgood = 2
-  
-  minme = function(scale){
-    (
-      mom_trunc_gamma(shape,scale,tgood,ord) - mean(tabs[tabs>tgood]^ord)
-    )^2
-  }
-  
-  temp = optimize(minme, c(0.1,6)/shape)
-  est = tibble(shape = shape, scale = temp$minimum, obj = temp$objective)
-  
-  return = est
-  
-} # est_trunc_gamma
-
-# TOOLS ====
-
-detach_all = function(){
-  invisible(lapply(paste0('package:', names(sessionInfo()$otherPkgs)), detach, character.only=TRUE, unload=TRUE))
-}
-
-histcomp = function(
-  dat1,dat2
-  ,label1 = '1',label2 = '2'
-  ,edge=seq(-3,15,0.5),tgood=-Inf
-){
-  t = dat1
-  t = t[t>min(edge) & t<max(edge)]
-  hemp = hist(t,edge)
-  
-  t = dat2
-  t = t[t>min(edge) & t<max(edge)]
-  hsim = hist(t,edge)
-  
-  plotme = rbind(
-    data.frame(
-      t = hemp$mids
-      , f = hemp$density / sum(dat1>tgood) * length(dat1)
-      , group = label1
-    )
-    , data.frame(
-      t = hsim$mids
-      , f = hsim$density / sum(dat2>tgood) * length(dat2)
-      , group = label2
-    )
-  )
-  
-  p1 = ggplot(plotme, aes(x=t, y=f, fill=group)) +
-    geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = F) 
-  
-  p2 = ggplot(
-    plotme %>% filter(t>tgood)
-    , aes(x=t, y=f, fill=group)
-  ) +
-    geom_bar(stat='identity', position='identity',alpha=0.6, show.legend = F) 
-  
-  
-  grid.arrange(p1, p2, nrow=1)  
-} # end function
 
 # AESTHETICS ====
 
@@ -162,7 +78,6 @@ theme_set(
       # text = element_text(family = "ArialMT")
     )
 )
-
 
 # histogram data prep function -----------------------------------------------
 
@@ -276,27 +191,3 @@ bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr 
 
     return(bootdat)
 } # end bootstrap_flex
-
-# function for turning bootstrap results into a histogram
-histogram_by_group = function(bootact, edge, varname = 'tstat', group = 'booti') {
-
-  bootact = bootact %>% select(all_of(c(group, varname)))
-  colnames(bootact) = c('booti', 'xvar')
-
-  boothist = bootact %>%
-    # histogram counts within each bootstrap
-    mutate(bin = cut(xvar, breaks = edge, include.lowest = TRUE)) %>%
-    group_by(booti, bin) %>%
-    summarize(count = n(), .groups = 'drop')  %>% 
-    # normalize by total signals
-    left_join(bootact %>% group_by(booti) %>% summarize(ntotal=n()), by = "booti") %>% 
-    # find bin midpoints 
-    mutate(bin = str_remove_all(bin, "[\\(\\)\\[\\]]")
-        , left = str_split(bin, ",")
-        , left = sapply(left, function(x) as.numeric(x[1]))
-        , right = str_split(bin, ",")
-        , right = sapply(right, function(x) as.numeric(x[2]))
-        , mids = (left + right) / 2
-    ) %>% 
-    setDT()
-}

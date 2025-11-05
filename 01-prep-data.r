@@ -160,6 +160,8 @@ clzvw_sum = clzvw_ret %>%
 
 # ADD YZ DATA -------------------------------
 
+print('Downloading YZ data from Dropbox')
+
 # download from Dropbox
 url_yz = 'https://www.dropbox.com/scl/fi/tv7zhkgrb7jbl4mr2ccdn/Yan_Zheng_RFS_Data.sas7bdat?rlkey=zxcrit8ptfe4mdq0q5blbx71c&st=s5ox6lts&dl=1'
 download.file(url_yz, destfile = file.path(data_dir, 'Yan_Zheng_RFS_Data.sas7bdat'), mode = 'wb')
@@ -216,6 +218,8 @@ set_boot = list(
   ncore = 8
 )
 
+print(paste0('CLZ bootstrap starting with nboot = ', set_boot$nboot)
+)
 boot_timer_start = Sys.time()
 
 bootact = bootstrap_flex(

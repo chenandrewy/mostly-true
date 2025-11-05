@@ -12,7 +12,7 @@ library(here)
 here::i_am("main.r")
 
 cat("\n=== Running 01-prep-data.r ===\n")
-# source(here("01-prep-data.r"), chdir = FALSE, echo = TRUE)
+source(here("01-prep-data.r"), chdir = FALSE, echo = TRUE)
 
 cat("\n=== Running 02-easy-bounds.r ===\n")
 source(here("02-easy-bounds.r"), chdir = FALSE, echo = TRUE)

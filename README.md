@@ -29,8 +29,9 @@ This code is a shorter and cleaner version of the `mostly-true` repo, which had 
 - **config-and-functions.r**: Provides project configuration utilities and shared helper functions
 
 ### Data Preparation
-- **01-prep-data.r**: Downloads and processes predictor return data from Google Drive and Dropbox; creates cleaned datasets for Chen et al., CLZ, and Yan-Zheng predictors
+- **01-prep-data.r**: Downloads and processes predictor return data from Google Drive and Dropbox; creates cleaned datasets for Chen et al., CLZ, and Yan-Zheng predictors; also runs the CLZ bootstraps
   - Creates: `data/emp_data.Rdata` (required by most other scripts)
+  - Creates: `data/bootact.Rdata` (bootstrap samples for CLZ returns)
 
 ### Main Analysis
 - **02-easy-bounds.r**: Visualizes easy- and visual-bound intuition figures used in the paper
@@ -44,34 +45,18 @@ This code is a shorter and cleaner version of the `mostly-true` repo, which had 
 - **05-hlz-simpler.r**: Provides a simplified HLZ simulation for two key comparison figures
   - Requires: None (fully independent, generates own simulations)
 
-## Dependency Structure
+## R Environment
 
-**To run everything**: Simply run `Rscript main.r` — it executes all scripts in the correct order.
-
-**For individual scripts**, most can be run independently after data preparation:
-
-1. **Core dependency**: Run `01-prep-data.r` first (downloads data, creates `emp_data.Rdata`)
-2. **Fully independent**: Script 05 generates its own simulations and has no data dependencies
-
-### Option 1: Run everything (recommended)
-```r
-Rscript main.r
-```
-This runs all scripts in the proper dependency order:
-1. Data preparation (01)
-2. Main analyses (02-05)
-
-### Option 2: Run scripts individually
-```r
-# 1. Prepare data (required for most analyses)
-source("01-prep-data.r")
-
-# 2. Run main analyses (can run in any order)
-source("02-easy-bounds.r")
-source("03-visual-bounds.r")  # auto-generates bootstrap if needed
-source("04-factor-adjustments-yz.r")
-source("04alt-factor-adjustments-clz.r")
-source("05-hlz-simpler.r")  # independent
-```  
-
-
+- R version 4.5.0 (2025-04-11) — "How About a Twenty-Six"
+- Package versions used:
+  - here 1.0.1
+  - tidyverse 2.0.0
+  - data.table 1.17.8
+  - ggplot2 4.0.0
+  - extrafont 0.19
+  - latex2exp 0.9.6
+  - kableExtra 1.4.0
+  - googledrive 2.1.2
+  - haven 2.5.5  
+  - foreach 1.5.2
+  - doParallel 1.0.17
