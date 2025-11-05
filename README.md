@@ -18,7 +18,7 @@ This code is a shorter and cleaner version of the `mostly-true` repo, which had 
   - Created by `04-factor-adjustments-yz.r`
   - Output name: `yz-fdr.tex`
 - Figure 3: Two Interpretations of Harvey, Liu, and Zhu's (2016) SMM Estimates 
-  - Created by: `hlz-simpler.r`
+  - Created by: `05-hlz-simpler.r`
   - Output names: `hlz-simp-standard.pdf` and `hlz-simp-post-truth.pdf`
 
 

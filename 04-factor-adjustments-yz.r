@@ -118,15 +118,12 @@ tab_viz = regest2 %>%
   summarize(
     Pr_tgt_2 = mean(abs(tstat) > 2)
     , Pr_tlt_05 = mean(abs(tstat) < 0.5)
-    , Pr_tlt_1 = mean(abs(tstat) < 1)
   ) %>% 
   ungroup() %>% 
   mutate(
     FDRmax_ez = 0.05/Pr_tgt_2
     , pFmax = Pr_tlt_05/0.38
-    , pFmax_1 = Pr_tlt_1/0.68
     , FDRmax_viz = FDRmax_ez*pFmax
-    , FDRmax_viz_1 = FDRmax_ez*pFmax_1
   )
 
 #%% Calculate Storey following HL ------------------------------------------------------
@@ -190,10 +187,10 @@ temp2 = tab_Storey %>%
 tab = temp1 %>% bind_rows(temp2)
 
 # make the nice wide table
-stat_select = c('Pr_tgt_2', 'Pr_tlt_1'
-    , 'pFmax', 'FDRmax_viz_1'
+stat_select = c('Pr_tgt_2', 'Pr_tlt_05'
+    , 'pFmax', 'FDRmax_viz'
     ,'h_HL', 'pct_signif_HL')
-stat_label = c('Share of $|t_i| > 2.0$', 'Share of $|t_i| < 1.0$'
+stat_label = c('Share of $|t_i| > 2.0$', 'Share of $|t_i| < 0.5$'
     , '$\\Pr(\\nullt_i)$ Upper Bound', '$\\FDRez$ Upper Bound'
     , '$t$-statistic Hurdle $h$', 'Percent Significant')
 model_select = c('CAPM', 'FF3', 'FF3+Mom')
@@ -240,3 +237,4 @@ writeLines(tex, con = yz_fdr_results_path)
 if (dir.exists(paper_exhibits_dir)) {
   writeLines(tex, con = paper_yz_fdr_path)
 }
+
