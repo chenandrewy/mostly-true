@@ -173,7 +173,7 @@ for (FDRmax in c(0.05, 0.10)) {
 tab_Storey = tabout %>% 
     left_join(temp1 %>% transmute(sweight, model, pct_alt = 100*pT)
         , by = c('sweight','model')) 
-rm(list = ls(pattern = "temp"))
+rm(list = c('temp1', 'temp2', 'temp3'))
 
 #%% Export latex ----------------------------------------------------
 
