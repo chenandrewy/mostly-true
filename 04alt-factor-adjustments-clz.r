@@ -9,15 +9,15 @@
 #   - results/temp.tex
 #   - results/vw-ffn-visual-raw.tex
 # How to run:
-#   Rscript 05-factor-adjustments-clz.r
-#   Rscript 05-factor-adjustments-clz.r --vanilla
+#   Rscript 04alt-factor-adjustments-clz.r
+#   Rscript 04alt-factor-adjustments-clz.r --vanilla
 
 # Setup -----------------------------------------------------------------------
 
 rm(list = ls())
 
 library(here)
-here::i_am("05-factor-adjustments-clz.r")
+here::i_am("04alt-factor-adjustments-clz.r")
 
 source(here("config-and-functions.r"))
 

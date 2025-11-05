@@ -26,20 +26,11 @@ main_analysis <- c(
   "02-easy-bounds.r",
   "03-visual-bounds.r",
   "04-factor-adjustments-yz.r",
-  "05-factor-adjustments-clz.r",
-  "06-literature-reconciliation-hlz.r",
-  "07-hlz-simpler.r"
+  "04alt-factor-adjustments-clz.r",
+  "05-hlz-simpler.r"
 )
 
-simulations <- c(
-  "91-run-bootstraps.r",
-  "92-bootstrap-validation.r",
-  "93-simulations-theory-free.r",
-  "94-simulations-publication-bias.r",
-  "95-simulations-standard-errors.r"
-)
-
-# run_scripts(c(data_prep, main_analysis, simulations))
-run_scripts(c(main_analysis, simulations))
+run_scripts(c(data_prep))
+run_scripts(c(main_analysis))
 
 cat("\n=== All scripts completed successfully ===\n")

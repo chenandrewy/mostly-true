@@ -1,5 +1,5 @@
 # ABOUTME: Downloads and processes predictor return data from Google Drive and Dropbox
-# ABOUTME: Creates cleaned datasets for Chen et al., CLZ, and Yan-Zheng predictors
+# ABOUTME: Creates cleaned datasets and CLZ bootstraps for Chen et al., CLZ, and Yan-Zheng predictors
 # Inputs:
 #   - config-and-functions.r (project configuration and helpers)
 #   - googledrive package (for authentication)
@@ -9,6 +9,7 @@
 #   - Yan-Zheng predictor data (downloaded from Dropbox)
 # Outputs:
 #   - data/emp_data.Rdata (contains cz_ret, cz_sum, clz_ret, clz_sum, clzvw_ret, clzvw_sum, yz_ret, yz_sum, yzvw_ret, yzvw_sum)
+#   - data/bootact.Rdata (bootstrap samples for CLZ returns)
 #   - data/PredictorPortsFull.csv (downloaded from Google Drive)
 #   - data/SignalDoc.csv (downloaded from Google Drive)
 #   - data/CLZ_raw.csv (downloaded from Google Drive)
@@ -206,3 +207,27 @@ save(
     )
   , file = file.path(data_dir, 'emp_data.Rdata')
 )
+
+# BOOTSTRAP CLZ RETURNS -------------------------------
+
+set_boot = list(
+  nboot = 1000,
+  min_obs_pct = 50,
+  ncore = 8
+)
+
+boot_timer_start = Sys.time()
+
+bootact = bootstrap_flex(
+  clz_ret,
+  nboot = set_boot$nboot,
+  min_obs_pct = set_boot$min_obs_pct,
+  demean = FALSE,
+  ncore = set_boot$ncore
+)
+
+boot_timer_end = Sys.time()
+
+print(paste0('CLZ bootstrap finished in minutes: ', difftime(boot_timer_end, boot_timer_start, units = 'mins')))
+
+save(bootact, file = file.path(data_dir, 'bootact.Rdata'))

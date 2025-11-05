@@ -5,8 +5,8 @@
 #   - results/hlz-simp-standard.pdf
 #   - results/hlz-simp-post-truth.pdf
 # How to run:
-#   Rscript 07-hlz-simpler.r
-#   Rscript 07-hlz-simpler.r --vanilla
+#   Rscript 05-hlz-simpler.r
+#   Rscript 05-hlz-simpler.r --vanilla
 
 # Setup -------------------------------------------------------------------
 rm(list = ls())
@@ -22,7 +22,7 @@ library(ggplot2)
 library(extrafont)
 library(latex2exp)
 
-here::i_am("07-hlz-simpler.r")
+here::i_am("05-hlz-simpler.r")
 
 results_dir <- here("results")
 if (!dir.exists(results_dir)) {
