@@ -18,8 +18,6 @@
 #   ├─ config-and-functions.r
 #   ├─ data/              # created if missing; RData/CSV outputs from prep scripts
 #   ├─ results/           # created if missing; PDFs/TEX/plots from analysis scripts
-#   │  ├─ sim-theory-free/
-#   │  └─ sim-extrap-pub/
 #   ├─ temp/              # scratch space for intermediates (optional; created on demand)
 #   ├─ 0X-*.r             # numbered analysis scripts
 #   └─ …
@@ -37,9 +35,7 @@ project_paths <- function() {
   list(
     data = ensure_dir(here::here("data")),
     temp = ensure_dir(here::here("temp")),
-    results = results_root,
-    results_sim_theory_free = ensure_dir(file.path(results_root, "sim-theory-free")),
-    results_sim_extrap_pub = ensure_dir(file.path(results_root, "sim-extrap-pub"))
+    results = results_root
   )
 }
 
@@ -48,8 +44,6 @@ library(here)
 paths <- project_paths()
 DATA_DIR <- paths$data
 RESULTS_DIR <- paths$results
-SIM_THEORY_FREE_DIR <- paths$results_sim_theory_free
-SIM_EXTRAP_PUB_DIR <- paths$results_sim_extrap_pub
 
 library(data.table)
 library(tidyverse)
@@ -305,9 +299,4 @@ histogram_by_group = function(bootact, edge, varname = 'tstat', group = 'booti')
         , mids = (left + right) / 2
     ) %>% 
     setDT()
-}
-
-unregister_dopar <- function() {
-  env <- foreach:::.foreachGlobals
-  rm(list=ls(name=env), pos=env)
 }
