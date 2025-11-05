@@ -155,6 +155,15 @@ NICEBLUE = "#619CFF"
 NICEGREEN = "#00BA38"
 NICERED = "#F8766D"
 
+theme_set(
+  theme_minimal() +
+    theme(
+      text = element_text(family = "Palatino Linotype")
+      # text = element_text(family = "ArialMT")
+    )
+)
+
+
 # histogram data prep function -----------------------------------------------
 
 # creates data for comparing cdf F1 to cdf F2 in a plot
@@ -197,15 +206,6 @@ make_dist_dat = function(F1, edge1, N1, F2, edge2, N2
   return(dat)
   
 } # make_dist_dat
-
-## set theme ====
-# theme_set(
-#   theme_minimal() +
-#     theme(
-#       # text = element_text(family = "Palatino Linotype")
-#       text = element_text(family = "ArialMT")
-#     )
-# )
 
 # define bootstrap function -------------------------------
 bootstrap_flex <- function(ret, nboot, coli = "signalname", colt = "date", colr = "ret", min_obs_pct = 50, demean = TRUE, ncore = 1, output_cor = FALSE) {

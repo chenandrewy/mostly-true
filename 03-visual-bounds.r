@@ -141,8 +141,7 @@ plotme_err <- plotme %>%
 plt <- ggplot(plotme_err[group != "null_ez"], aes(x = mids, y = dF)) +
   coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
   scale_y_continuous(breaks = yticks) +
-  theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
+  xlab(TeX("Absolute t-statistic ($|t_i|$)")) +
   ylab("Number of Signals") +
   # bars
   geom_bar(
@@ -189,7 +188,7 @@ plt <- ggplot(plotme_err[group != "null"], aes(x = mids, y = dF)) +
   coord_cartesian(xlim = c(0, 8), ylim = ylimnum) +
   scale_y_continuous(breaks = yticks) +
   theme(legend.position = c(0.7, 0.7)) +
-  xlab(TeX("Absolute t-statistic")) +
+  xlab(TeX("Absolute t-statistic ($|t_i|$)")) +
   ylab("Number of Signals") +
   # bars
   geom_bar(
