@@ -1,31 +1,17 @@
 # mostly-true-short
-Code to accompany "Most claimed statistical findings in cross-sectional return predictability are likely true" (Journal of Finance: Insights and Perspectives). 
+Code to accompany "Most claimed statistical findings in cross-sectional return predictability are likely true" (Journal of Finance: Insights and Perspectives). Working paper version: https://arxiv.org/abs/2206.15365.
 
-This code is a shorter and cleaner version of the `mostly-true` repo, which had results for the longer previous drafts of the paper. For simulation evidence that the FDR estimates work, see the `mostly-true` repo.
+This code is a shorter and cleaner version of the [mostly-true](https://github.com/chenandrewy/mostly-true) repo, which had results for the longer, [previous drafts](https://arxiv.org/abs/2206.15365v6) of the paper. For simulation evidence that the FDR estimates work in cross-sectional asset pricing, see the [mostly-true](https://github.com/chenandrewy/mostly-true) repo.
 
-# Exhibits in the paper
-- Table 1: Easy Bounds on the FDR
-  - `ez-combined.tex`
-  - Created from `ez-table.xlsx` w/ excel2latex plugin (manually)
-- Figure 1: Conservative Extrapolation from Published t-stats
-  - Created by `02-easy-bounds.r`
-  - Output name: `hlz-intuition.pdf`
-- Figure 2: A Visual Bound on the FDR
-  - Created by `03-visual-bounds.r`
-  - `dm-viz-storey-err.pdf` 
-  - `dm-viz-ez-err.pdf`
-- Table 2: FDR Estimates Controlling for Value Weighting and Factor Adjustments
-  - Created by `04-factor-adjustments-yz.r`
-  - Output name: `yz-fdr.tex`
-- Figure 3: Two Interpretations of Harvey, Liu, and Zhu's (2016) SMM Estimates 
-  - Created by: `05-hlz-simpler.r`
-  - Output names: `hlz-simp-standard.pdf` and `hlz-simp-post-truth.pdf`
-
+## Excel Table
+- `ez-table.xlsx`: used to create Table 1: Easy Bounds on the FDR
+  - The bounds are easy, after all. No need for real code.
+  - The tex input is created manually using excel2latex plugin.
 
 ## R Scripts
 
 ### Main Workflow
-- **main.r**: Coordinates the full analysis workflow by sourcing project scripts in sequence
+- **main.r**: Runs all scripts in order. 
 - **config-and-functions.r**: Provides project configuration utilities and shared helper functions
 
 ### Data Preparation
@@ -33,19 +19,24 @@ This code is a shorter and cleaner version of the `mostly-true` repo, which had 
   - Creates: `data/emp_data.Rdata` (required by most other scripts)
   - Creates: `data/bootact.Rdata` (bootstrap samples for CLZ returns)
 
-### Main Analysis
-- **02-easy-bounds.r**: Visualizes easy- and visual-bound intuition figures used in the paper
+### Make Exhibits
+- **02-easy-bounds.r**: Makes Figure 1: Conservative Extrapolation from Published t-stats
   - Requires: `data/emp_data.Rdata`
-- **03-visual-bounds.r**: Builds diagnostic figures and tables contrasting empirical distribution with null models
-  - Requires: `data/emp_data.Rdata`, optionally `data/bootact.Rdata` (regenerates if missing)
-- **04-factor-adjustments-yz.r**: Estimates factor-adjusted performance for Yan-Zheng predictors and exports LaTeX tables
+  - Output name: `hlz-intuition.pdf`
+- **03-visual-bounds.r**: Makes Figure 2: A Visual Bound on the FDR
+  - Requires: `data/emp_data.Rdata` and `data/bootact.Rdata` 
+  - Output names: `dm-viz-storey-err.pdf` and `dm-viz-ez-err.pdf`
+- **04-factor-adjustments-yz.r**: Makes Table 2: FDR Estimates Controlling for Value Weighting and Factor Adjustments
   - Requires: `data/emp_data.Rdata`
-- **04alt-factor-adjustments-clz.r**: Computes factor-adjusted statistics for CLZ predictors and produces LaTeX output
+  - Output name: `yz-fdr.tex`
+- **04alt-factor-adjustments-clz.r**: Makes an alternative version of Table 2, but is not used in paper.
   - Requires: `data/emp_data.Rdata`
-- **05-hlz-simpler.r**: Provides a simplified HLZ simulation for two key comparison figures
+  - Output name: `vw-ffn-visual-raw.tex`
+- **05-hlz-simpler.r**: Makes Figure 3: Two Interpretations of Harvey, Liu, and Zhu's (2016) SMM Estimates 
   - Requires: None (fully independent, generates own simulations)
+  - Output names: `hlz-simp-standard.pdf` and `hlz-simp-post-truth.pdf`
 
-## R Environment
+## Environment
 
 - R version 4.5.0 (2025-04-11) — "How About a Twenty-Six"
 - Package versions used:
@@ -60,3 +51,6 @@ This code is a shorter and cleaner version of the `mostly-true` repo, which had 
   - haven 2.5.5  
   - foreach 1.5.2
   - doParallel 1.0.17
+- Run on MacBook M4 Pro
+  - 24 GB RAM
+- Run time is very roughly 5 minutes
