@@ -1,7 +1,11 @@
-# mostly-true-short
+# mostly-true
 Code to accompany "Most claimed statistical findings in cross-sectional return predictability are likely true" (Journal of Finance: Insights and Perspectives). Working paper version: https://arxiv.org/abs/2206.15365.
 
-This code is a shorter and cleaner version of the [mostly-true](https://github.com/chenandrewy/mostly-true) repo, which had results for the longer, [previous drafts](https://arxiv.org/abs/2206.15365v6) of the paper. For simulation evidence that the FDR estimates work in cross-sectional asset pricing, see the [mostly-true](https://github.com/chenandrewy/mostly-true) repo.
+This code omits the bootstrap simulation "proof" that standard FDR estimates work in cross-sectional asset pricing. For that evidence, see the [long-version branch](https://github.com/chenandrewy/mostly-true/tree/long-version) of the code and the [previous draft](https://arxiv.org/abs/2206.15365v6) of the paper.
+
+The code downloads all the data you need, including the Yan-Zheng (2017, RFS) data-mined strategies. Special thanks to [Sterling Yan](https://business.lehigh.edu/directory/xuemin-sterling-yan) and [Lingling Zheng](https://linglingzheng.com/research) for sharing their data.
+
+# Repo Contents
 
 ## Excel Table
 - `ez-table.xlsx`: used to create Table 1: Easy Bounds on the FDR
